@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://github.com/andyfied-Thargoid/chess-commander/contracts/choose-move.v1.schema.json",
+  "title": "Chess Commander choose_move contract",
+  "type": "object",
+  "required": ["request_id", "position", "legal_moves_uci", "clock", "backend", "strategy_revision"],
+  "properties": {
+    "request_id": {"type": "string", "minLength": 1},
+    "position": {
+      "type": "object",
+      "required": ["fen", "moves_uci"],
+      "properties": {
+        "fen": {"type": "string", "minLength": 1},
+        "moves_uci": {"type": "array", "items": {"type": "string"}}
+      },
+      "additionalProperties": false
+    },
+    "legal_moves_uci": {
+      "type": "array",
+      "items": {"type": "string", "pattern": "^[a-h][1-8][a-h][1-8][qrbn]?$"},
+      "minItems": 1,
+      "uniqueItems": true
+    },
+    "clock": {
+      "type": "object",
+      "required": ["white_ms", "black_ms", "increment_ms"],
+      "properties": {
+        "white_ms": {"type": "integer", "minimum": 0},
+        "black_ms": {"type": "integer", "minimum": 0},
+        "increment_ms": {"type": "integer", "minimum": 0},
+        "deadline_ms": {"type": ["integer", "null"], "minimum": 0}
+      },
+      "additionalProperties": false
+    },
+    "backend": {
+      "type": "string",
+      "enum": ["acornsoft", "thompson"]
+    },
+    "strategy_revision": {"type": "string", "minLength": 1},
+    "model": {"type": ["string", "null"]},
+    "prompt_revision": {"type": ["string", "null"]}
+  },
+  "additionalProperties": false
+}

@@ -1,0 +1,16 @@
+# BBC Micro disk images and emulator/runtime state stay outside Git.
+*.ssd
+*.dsd
+*.adl
+downloads/
+runtime/
+state/
+
+# Python and local development output.
+__pycache__/
+*.py[cod]
+.venv/
+.pytest_cache/
+dist/
+build/
+*.egg-info/

@@ -1,0 +1,532 @@
+{
+  "schema": "chess-commander.position-corpus.v1",
+  "generator": "tools/build_position_corpus.py",
+  "referee": "python-chess",
+  "oracle_status": "legal move baseline complete; BBC reference outputs pending Phase 1",
+  "fixtures": [
+    {
+      "id": "startpos",
+      "fen": "rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+      "tags": [
+        "opening",
+        "baseline"
+      ],
+      "purpose": "Initial board and full legal move generation.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "a2a3",
+        "a2a4",
+        "b1a3",
+        "b1c3",
+        "b2b3",
+        "b2b4",
+        "c2c3",
+        "c2c4",
+        "d2d3",
+        "d2d4",
+        "e2e3",
+        "e2e4",
+        "f2f3",
+        "f2f4",
+        "g1f3",
+        "g1h3",
+        "g2g3",
+        "g2g4",
+        "h2h3",
+        "h2h4"
+      ],
+      "legal_move_count": 20,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "ruy_lopez_after_a6",
+      "fen": "r1bqkbnr/1ppp1ppp/p1n5/1B2p3/4P3/5N2/PPPP1PPP/RNBQK2R w KQkq - 0 4",
+      "tags": [
+        "opening",
+        "developed"
+      ],
+      "purpose": "Normal opening position with castling rights preserved.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "a2a3",
+        "a2a4",
+        "b1a3",
+        "b1c3",
+        "b2b3",
+        "b2b4",
+        "b5a4",
+        "b5a6",
+        "b5c4",
+        "b5c6",
+        "b5d3",
+        "b5e2",
+        "b5f1",
+        "c2c3",
+        "c2c4",
+        "d1e2",
+        "d2d3",
+        "d2d4",
+        "e1e2",
+        "e1f1",
+        "e1g1",
+        "f3d4",
+        "f3e5",
+        "f3g1",
+        "f3g5",
+        "f3h4",
+        "g2g3",
+        "g2g4",
+        "h1f1",
+        "h1g1",
+        "h2h3",
+        "h2h4"
+      ],
+      "legal_move_count": 32,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "castling_both_sides",
+      "fen": "r3k2r/ppp2ppp/2npbn2/8/8/2NPBN2/PPP2PPP/R3K2R w KQkq - 0 1",
+      "tags": [
+        "castling",
+        "tactical"
+      ],
+      "purpose": "Both sides retain legal kingside and queenside castling rights.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "a1b1",
+        "a1c1",
+        "a1d1",
+        "a2a3",
+        "a2a4",
+        "b2b3",
+        "b2b4",
+        "c3a4",
+        "c3b1",
+        "c3b5",
+        "c3d1",
+        "c3d5",
+        "c3e2",
+        "c3e4",
+        "d3d4",
+        "e1c1",
+        "e1d1",
+        "e1d2",
+        "e1e2",
+        "e1f1",
+        "e1g1",
+        "e3a7",
+        "e3b6",
+        "e3c1",
+        "e3c5",
+        "e3d2",
+        "e3d4",
+        "e3f4",
+        "e3g5",
+        "e3h6",
+        "f3d2",
+        "f3d4",
+        "f3e5",
+        "f3g1",
+        "f3g5",
+        "f3h4",
+        "g2g3",
+        "g2g4",
+        "h1f1",
+        "h1g1",
+        "h2h3",
+        "h2h4"
+      ],
+      "legal_move_count": 42,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "en_passant_white",
+      "fen": "r3k2r/ppp2ppp/8/3pP3/8/8/PPP2PPP/R3K2R w KQkq d6 0 2",
+      "tags": [
+        "en-passant",
+        "special-move"
+      ],
+      "purpose": "White has an en-passant capture on d6.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "a1b1",
+        "a1c1",
+        "a1d1",
+        "a2a3",
+        "a2a4",
+        "b2b3",
+        "b2b4",
+        "c2c3",
+        "c2c4",
+        "e1c1",
+        "e1d1",
+        "e1d2",
+        "e1e2",
+        "e1f1",
+        "e1g1",
+        "e5d6",
+        "e5e6",
+        "f2f3",
+        "f2f4",
+        "g2g3",
+        "g2g4",
+        "h1f1",
+        "h1g1",
+        "h2h3",
+        "h2h4"
+      ],
+      "legal_move_count": 25,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "promotion_choice",
+      "fen": "4k3/P7/8/8/8/8/8/4K3 w - - 0 1",
+      "tags": [
+        "promotion",
+        "endgame"
+      ],
+      "purpose": "White must choose a promotion piece after advancing the a-pawn.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "a7a8b",
+        "a7a8n",
+        "a7a8q",
+        "a7a8r",
+        "e1d1",
+        "e1d2",
+        "e1e2",
+        "e1f1",
+        "e1f2"
+      ],
+      "legal_move_count": 9,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "forced_check_evasion",
+      "fen": "4r1k1/8/8/8/8/8/4r3/4K3 w - - 0 1",
+      "tags": [
+        "check",
+        "defense"
+      ],
+      "purpose": "White is in check and every returned move must evade it.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "e1d1",
+        "e1f1"
+      ],
+      "legal_move_count": 2,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "mate_in_one",
+      "fen": "7k/5Q2/6K1/8/8/8/8/8 w - - 0 1",
+      "tags": [
+        "checkmate",
+        "tactical"
+      ],
+      "purpose": "White has a mate-in-one candidate.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "f7a2",
+        "f7a7",
+        "f7b3",
+        "f7b7",
+        "f7c4",
+        "f7c7",
+        "f7d5",
+        "f7d7",
+        "f7e6",
+        "f7e7",
+        "f7e8",
+        "f7f1",
+        "f7f2",
+        "f7f3",
+        "f7f4",
+        "f7f5",
+        "f7f6",
+        "f7f8",
+        "f7g7",
+        "f7g8",
+        "f7h7",
+        "g6f5",
+        "g6f6",
+        "g6g5",
+        "g6h5",
+        "g6h6"
+      ],
+      "legal_move_count": 26,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "queen_capture",
+      "fen": "4k3/8/8/3q4/3R4/8/8/4K3 w - - 0 1",
+      "tags": [
+        "capture",
+        "tactical"
+      ],
+      "purpose": "White can capture an exposed queen with the rook.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "d4a4",
+        "d4b4",
+        "d4c4",
+        "d4d1",
+        "d4d2",
+        "d4d3",
+        "d4d5",
+        "d4e4",
+        "d4f4",
+        "d4g4",
+        "d4h4",
+        "e1d1",
+        "e1d2",
+        "e1e2",
+        "e1f1",
+        "e1f2"
+      ],
+      "legal_move_count": 16,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "king_pawn_endgame",
+      "fen": "8/8/8/8/2k5/8/4K3/8 w - - 0 1",
+      "tags": [
+        "endgame",
+        "zugzwang"
+      ],
+      "purpose": "Sparse position for endgame and evaluation behavior.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "e2d1",
+        "e2d2",
+        "e2e1",
+        "e2e3",
+        "e2f1",
+        "e2f2",
+        "e2f3"
+      ],
+      "legal_move_count": 7,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "fifty_move_boundary",
+      "fen": "8/8/8/8/8/8/2N5/K2k4 w - - 100 51",
+      "tags": [
+        "draw-rule",
+        "endgame"
+      ],
+      "purpose": "Halfmove clock is at the fifty-move claim boundary.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "a1a2",
+        "a1b1",
+        "a1b2",
+        "c2a3",
+        "c2b4",
+        "c2d4",
+        "c2e1",
+        "c2e3"
+      ],
+      "legal_move_count": 8,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "black_to_move_tactical",
+      "fen": "r1b1k2r/pppp1ppp/2n2n2/4p3/1b2P3/2N2N2/PPPP1PPP/R1BQKB1R b KQkq - 3 5",
+      "tags": [
+        "black-to-move",
+        "opening",
+        "tactical"
+      ],
+      "purpose": "Black-to-move position exercises side-to-move handling.",
+      "side_to_move": "black",
+      "legal_moves_uci": [
+        "a7a5",
+        "a7a6",
+        "a8b8",
+        "b4a3",
+        "b4a5",
+        "b4c3",
+        "b4c5",
+        "b4d6",
+        "b4e7",
+        "b4f8",
+        "b7b5",
+        "b7b6",
+        "c6a5",
+        "c6b8",
+        "c6d4",
+        "c6d8",
+        "c6e7",
+        "d7d5",
+        "d7d6",
+        "e8d8",
+        "e8e7",
+        "e8f8",
+        "e8g8",
+        "f6d5",
+        "f6e4",
+        "f6g4",
+        "f6g8",
+        "f6h5",
+        "g7g5",
+        "g7g6",
+        "h7h5",
+        "h7h6",
+        "h8f8",
+        "h8g8"
+      ],
+      "legal_move_count": 34,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    },
+    {
+      "id": "promotion_with_capture",
+      "fen": "1r2k3/P7/8/8/8/8/8/4K3 w - - 0 1",
+      "tags": [
+        "promotion",
+        "capture",
+        "endgame"
+      ],
+      "purpose": "Promotion position with a black rook available as a tactical target.",
+      "side_to_move": "white",
+      "legal_moves_uci": [
+        "a7a8b",
+        "a7a8n",
+        "a7a8q",
+        "a7a8r",
+        "a7b8b",
+        "a7b8n",
+        "a7b8q",
+        "a7b8r",
+        "e1d1",
+        "e1d2",
+        "e1e2",
+        "e1f1",
+        "e1f2"
+      ],
+      "legal_move_count": 13,
+      "oracle": {
+        "status": "pending",
+        "acornsoft": {
+          "move_uci": null,
+          "candidates_uci": null
+        },
+        "thompson": {
+          "move_uci": null,
+          "candidates_uci": null
+        }
+      }
+    }
+  ]
+}

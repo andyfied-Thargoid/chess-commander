@@ -264,7 +264,7 @@ class PunchessChessClient:
             game_id: Game identifier
             
         Returns:
-            Winning move UCI if won, None otherwise
+            The last move UCI if the game completed, None otherwise (failure, early termination)
         """
         # Join the game
         joined = await self.client.join_game(
@@ -275,6 +275,9 @@ class PunchessChessClient:
         if not joined:
             return None
         
+        # Initialize move_uci before the loop to avoid UnboundLocalError
+        move_uci: Optional[str] = None
+        
         while True:
             # Get game status
             status = await self.client.get_game_status(game_id)
@@ -283,8 +286,8 @@ class PunchessChessClient:
                 print(f"Failed to get status for game {game_id}")
                 break
             
-            # Check if game is over
-            if status.checkmate or status.stalemate or status.insufficient_material:
+            # Check if game is over (all 5 terminal conditions)
+            if status.checkmate or status.stalemate or status.insufficient_material or status.fifty_move_rule or status.threefold_repetition:
                 report = await self.client.get_game_report(game_id)
                 print(f"Game {game_id} ended: {self._get_result_string(report)}")
                 break
@@ -305,6 +308,9 @@ class PunchessChessClient:
             print(f"Game {game_id}: Position {position}")
             print(f"Legal moves: {legal_moves[:5]}...")
             
+            # Fix: Use correct increment for the side to move
+            increment_ms = status.white_increment if board.turn == chess.WHITE else status.black_increment
+            
             move_result = self.backend.choose_move(
                 request_id=game_id,
                 position=position,
@@ -312,7 +318,7 @@ class PunchessChessClient:
                 clock={
                     "white_ms": status.white_time_left or 300000,
                     "black_ms": status.black_time_left or 300000,
-                    "increment_ms": status.white_increment or 0
+                    "increment_ms": increment_ms
                 }
             )
             

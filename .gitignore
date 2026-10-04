@@ -1,16 +1,31 @@
-# BBC Micro disk images and emulator/runtime state stay outside Git.
-*.ssd
-*.dsd
-*.adl
-downloads/
-runtime/
-state/
-
-# Python and local development output.
+# Python bytecode
 __pycache__/
 *.py[cod]
-.venv/
-.pytest_cache/
-dist/
+*$py.class
+*.so
+
+# Virtual environments
+venv/
+env/
+.env
+
+# IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Build artifacts
 build/
+dist/
 *.egg-info/
+
+# Testing
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Chess Commander specific
+chess_commander/__pycache__/
+chess_commander/backends/__pycache__/
+tests/__pycache__/

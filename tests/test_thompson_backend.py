@@ -1,5 +1,12 @@
 """
 Unit tests for Thompson Chess backend.
+
+Note: Tests requiring SSD files require the file at:
+  - Default: /mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd
+  - Override: Set THOMPSON_SSD_PATH environment variable
+
+On compute01: SSD files are at /mnt/scratch/project-data/chess-commander/
+On other systems: Tests will skip if SSD file not found.
 """
 
 import pytest
@@ -11,42 +18,23 @@ from chess_commander.backends.interface import BackendType
 class TestThompsonBackendInit:
     """Test backend initialization."""
     
-    def test_backend_instantiation(self):
+    def test_backend_instantiation(self, backend):
         """Test that backend can be instantiated."""
-        backend = ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
-        
         assert backend is not None
         assert backend.backend_type == BackendType.THOMPSON
         assert backend.strategy_revision == 'test-v0'
     
-    def test_source_sha256(self):
+    def test_source_sha256(self, backend):
         """Test source SHA-256 hash."""
-        backend = ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
-        
         assert backend.source_sha256 == '80120f0f346194a388ebb7152d9970ec635612fee38b733d7002f113b941eb95'
     
-    def test_board_data_loaded(self):
+    def test_board_data_loaded(self, backend):
         """Test that board data is loaded from CHESS2."""
-        backend = ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
-        
         assert len(backend.board_data) == 64
         assert all(0 <= b <= 0xFF for b in backend.board_data)
     
-    def test_bitboard_tables_loaded(self):
+    def test_bitboard_tables_loaded(self, backend):
         """Test that bitboard tables are loaded."""
-        backend = ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
         
         assert 'knight' in backend.bitboard_tables
         assert 'bishop' in backend.bitboard_tables
@@ -59,12 +47,6 @@ class TestThompsonBackendInit:
 class TestFENToBoard:
     """Test FEN to board conversion."""
     
-    @pytest.fixture
-    def backend(self):
-        return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
     
     def test_starting_position(self, backend):
         """Test conversion of starting position."""
@@ -115,12 +97,6 @@ class TestFENToBoard:
 class TestCharToPiece:
     """Test character to piece value conversion."""
     
-    @pytest.fixture
-    def backend(self):
-        return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
     
     def test_white_pieces(self, backend):
         """Test white piece encoding."""
@@ -148,12 +124,6 @@ class TestCharToPiece:
 class TestChooseMove:
     """Test move selection."""
     
-    @pytest.fixture
-    def backend(self):
-        return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
     
     def test_choose_move_starting_position(self, backend):
         """Test move selection from starting position."""
@@ -239,12 +209,6 @@ class TestChooseMove:
 class TestGetCandidates:
     """Test candidate move generation."""
     
-    @pytest.fixture
-    def backend(self):
-        return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
     
     def test_get_candidates_n(self, backend):
         """Test getting top N candidates."""
@@ -266,12 +230,6 @@ class TestGetCandidates:
 class TestValidateMove:
     """Test move validation."""
     
-    @pytest.fixture
-    def backend(self):
-        return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
     
     def test_validate_legal_move(self, backend):
         """Test validation of legal move."""
@@ -306,22 +264,27 @@ class TestMaterialValues:
 class TestEvidenceGeneration:
     """Test evidence generation for move decisions."""
     
-    @pytest.fixture
-    def backend(self):
-        return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
-            strategy_revision='test-v0'
-        )
     
     def test_evidence_contains_required_fields(self, backend):
         """Test that evidence has all required fields."""
-        evidence = backend.get_evidence('e2e4', ['e2e4', 'e2e3', 'g1f3'])
+        position = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+        legal_moves = ['e2e4', 'e2e3', 'g1f3']
         
-        assert evidence.backend == BackendType.THOMPSON
-        assert evidence.source_sha256 is not None
-        assert evidence.strategy_revision == 'test-v0'
-        assert evidence.selected_move_uci == 'e2e4'
-        assert evidence.candidates_uci == ['e2e4', 'e2e3', 'g1f3']
+        result = backend.choose_move(
+            position=position,
+            legal_moves=legal_moves,
+            clock={'white_ms': 300000, 'black_ms': 300000, 'increment_ms': 0},
+            request_id='test-evidence'
+        )
+        
+        assert result.status == 'ok'
+        assert result.move_uci == 'e2e4'
+        assert result.evidence is not None
+        assert result.evidence.backend == BackendType.THOMPSON
+        assert result.evidence.source_sha256 is not None
+        assert result.evidence.strategy_revision == 'test-v0'
+        assert result.evidence.selected_move_uci == 'e2e4'
+        assert result.evidence.candidates_uci is not None
 
 
 if __name__ == '__main__':

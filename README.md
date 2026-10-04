@@ -8,7 +8,7 @@ Chess Commander implements a framework for running chess backends against the Pu
 
 - **Chess backends**: Native reimplementations of classic chess programs
 - **Punchess integration**: Client for game server interaction
-- **Test suite**: Unit tests for backend validation
+- **Test suite**: Unit tests for backend validation (note: requires compute01 SSD files)
 - **Documentation**: Phase completion reports and API reference
 
 ## Project Structure
@@ -26,7 +26,8 @@ chess-commander/
 │   └── test_thompson_backend.py
 ├── config/                   # Configuration
 │   └── backends.yaml
-├── docs/                     # Documentation
+├── references/               # Reference documentation
+│   └── chess-commander-2026-10-04.md
 └── tools/                    # P-code analysis tools
 ```
 
@@ -83,12 +84,16 @@ move = await client.play_game("game-123")
 python3 -m pytest tests/ -v
 ```
 
+**Note:** Tests requiring SSD files will skip if the file is not found. Set `THOMPSON_SSD_PATH` environment variable to override the default path.
+
+**CI:** Status checks run on every PR and push via `.github/workflows/ci.yml`.
+
 ## Documentation
 
-- [PHASE-2-COMPLETION.md](docs/PHASE-2-COMPLETION.md) - Phase 2 summary
-- [PHASE-2-THOMPSON-IMPLEMENTATION.md](docs/PHASE-2-THOMPSON-IMPLEMENTATION.md) - Thompson backend details
-- [PHASE-2-PUNCHESS-INTEGRATION.md](docs/PHASE-2-PUNCHESS-INTEGRATION.md) - Punchess client
-- [PHASE-2-ADAPTER-FRAMEWORK.md](docs/PHASE-2-ADAPTER-FRAMEWORK.md) - Framework design
+- [chess-commander-2026-10-04](references/chess-commander-2026-10-04.md) — Project reference
+- [PHASE-0-COMPLETION.md](PHASE-0-COMPLETION.md) — Phase 0 summary
+- [PHASE-1-SMOKE-TESTS.md](PHASE-1-SMOKE-TESTS.md) — Initial test results
+- [PHASE-2-COMPLETION.md](PHASE-2-COMPLETION.md) — Phase 2 summary
 
 ## Next Steps
 

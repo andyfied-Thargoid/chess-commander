@@ -26,6 +26,13 @@ jobs:
     
     - name: Run tests
       run: |
-        python3 -m pytest tests/ -v
+        python3 -m pytest tests/ -v --tb=short --strict-markers
+        # Check that we didn't skip all tests
+        test_output=$(python3 -m pytest tests/ -v --tb=short 2>&1)
+        echo "$test_output"
+        if echo "$test_output" | grep -q "100% skipped"; then
+          echo "ERROR: All tests were skipped. Set THOMPSON_SSD_PATH or add more non-SSD tests."
+          exit 1
+        fi
       env:
         THOMPSON_SSD_PATH: ${{ secrets.THOMPSON_SSD_PATH }}

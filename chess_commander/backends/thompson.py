@@ -257,10 +257,22 @@ class ThompsonChessBackend(ChessBackend):
         - Piece mobility
         - Center control
         - Pawn structure
+        
+        Note: This is a simplified evaluation that doesn't actually
+        simulate the move. A proper implementation would:
+        1. Apply the move to the board
+        2. Evaluate the resulting position
+        3. Return the negated score (from opponent's perspective)
         """
+        # For now, return material difference from current position
+        # TODO: Apply move, evaluate resulting position, return negated score
+        
         score = 0.0
         
         # Material score (simplified)
+        # White pieces use uppercase, black use lowercase
+        # But MATERIAL_VALUES has uppercase keys for both
+        # So we need to convert lowercase to uppercase for lookup
         white_material = sum(
             self.MATERIAL_VALUES.get(piece_char, 0)
             for piece_char in "PNBRQK"
@@ -268,17 +280,16 @@ class ThompsonChessBackend(ChessBackend):
             if (square & 0xF0) == (self._char_to_piece(piece_char) & 0xF0)
         )
         
+        # Black pieces: convert lowercase to uppercase for lookup
         black_material = sum(
-            self.MATERIAL_VALUES.get(piece_char, 0)
+            self.MATERIAL_VALUES.get(piece_char.upper(), 0)
             for piece_char in "pnbrqk"
             for square in board
             if (square & 0xF0) == (self._char_to_piece(piece_char) & 0xF0)
         )
         
-        score += white_material - black_material
-        
-        # TODO: Add mobility, center control, pawn structure
-        # These require full Thompson evaluation function extraction
+        # White is positive, black is negative (from white's perspective)
+        score = white_material - black_material
         
         return score
     

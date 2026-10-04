@@ -93,7 +93,8 @@ class ThompsonChessBackend(ChessBackend):
         position: str,
         legal_moves: List[str],
         clock: dict,
-        request_id: str
+        request_id: str,
+        strategy_revision: Optional[str] = None
     ) -> MoveResult:
         """
         Choose a move using Thompson's algorithm.
@@ -103,12 +104,16 @@ class ThompsonChessBackend(ChessBackend):
             legal_moves: List of legal UCI moves
             clock: Time control dict
             request_id: Unique request identifier
+            strategy_revision: Optional strategy version override
             
         Returns:
             MoveResult with selected move and evidence
         """
         import time
         start_time = time.time()
+        
+        # Use override strategy_revision if provided, otherwise use instance default
+        effective_strategy = strategy_revision if strategy_revision is not None else self.strategy_revision
         
         try:
             # Parse position to board state
@@ -132,7 +137,7 @@ class ThompsonChessBackend(ChessBackend):
                 evidence=MoveEvidence(
                     backend=self.backend_type,
                     source_sha256=self.source_sha256,
-                    strategy_revision=self.strategy_revision,
+                    strategy_revision=effective_strategy,
                     selected_move_uci=best_move,
                     candidates_uci=[m[1] for m in scored_moves[:10]],
                     latency_ms=latency_ms,
@@ -150,7 +155,7 @@ class ThompsonChessBackend(ChessBackend):
                 evidence=MoveEvidence(
                     backend=self.backend_type,
                     source_sha256=self.source_sha256,
-                    strategy_revision=self.strategy_revision,
+                    strategy_revision=effective_strategy,
                     failure_reason=f"Source file not found: {e}"
                 )
             )
@@ -162,7 +167,7 @@ class ThompsonChessBackend(ChessBackend):
                 evidence=MoveEvidence(
                     backend=self.backend_type,
                     source_sha256=self.source_sha256,
-                    strategy_revision=self.strategy_revision,
+                    strategy_revision=effective_strategy,
                     failure_reason=f"Move selection failed: {str(e)}"
                 )
             )

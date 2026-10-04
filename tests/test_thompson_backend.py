@@ -14,7 +14,7 @@ class TestThompsonBackendInit:
     def test_backend_instantiation(self):
         """Test that backend can be instantiated."""
         backend = ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
         
@@ -25,7 +25,7 @@ class TestThompsonBackendInit:
     def test_source_sha256(self):
         """Test source SHA-256 hash."""
         backend = ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
         
@@ -34,7 +34,7 @@ class TestThompsonBackendInit:
     def test_board_data_loaded(self):
         """Test that board data is loaded from CHESS2."""
         backend = ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
         
@@ -44,7 +44,7 @@ class TestThompsonBackendInit:
     def test_bitboard_tables_loaded(self):
         """Test that bitboard tables are loaded."""
         backend = ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
         
@@ -62,7 +62,7 @@ class TestFENToBoard:
     @pytest.fixture
     def backend(self):
         return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
     
@@ -118,7 +118,7 @@ class TestCharToPiece:
     @pytest.fixture
     def backend(self):
         return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
     
@@ -151,7 +151,7 @@ class TestChooseMove:
     @pytest.fixture
     def backend(self):
         return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
     
@@ -242,7 +242,7 @@ class TestGetCandidates:
     @pytest.fixture
     def backend(self):
         return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
     
@@ -269,7 +269,7 @@ class TestValidateMove:
     @pytest.fixture
     def backend(self):
         return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
     
@@ -309,7 +309,7 @@ class TestEvidenceGeneration:
     @pytest.fixture
     def backend(self):
         return ThompsonChessBackend(
-            source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+            source_path=SSD_PATH,
             strategy_revision='test-v0'
         )
     

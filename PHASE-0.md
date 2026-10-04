@@ -1,7 +1,6 @@
 # Phase 0 checkpoint
 
-Status: implemented for review. No player, emulator worker, or Punchess change
-has been made.
+Status: accepted. No player, emulator worker, or Punchess change has been made.
 
 ## Selected analysis workflow
 
@@ -12,8 +11,8 @@ has been made.
    a command-line disk image, supports BBC B models with the 8271 controller,
    and exposes a debugger through the terminal. Start with BBC B model 3:
 
-       b-em /mnt/scratch/downloads/Acornsoft_Chess_V2.1.ssd -m3
-       b-em /mnt/scratch/downloads/Computer_Concepts_Chess_DThompson.ssd -m3
+       b-em /mnt/scratch/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd -m3
+       b-em /mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd -m3
 
    These commands are procedure examples only; B-Em is not installed on this
    host yet. Emulator runs must use disposable config, CMOS, and save-state
@@ -37,15 +36,15 @@ References:
 ## Source boundary
 
 `SOURCE_MANIFEST.json` records the two verified local SSDs. The images remain
-under `/mnt/scratch/downloads` and are excluded from Git. The source programs'
+under `/home/andyfied/Downloads` and are excluded from Git. The source programs'
 redistribution status is not established, so the repository may contain
 annotations, hashes, and original-authored clean-room reimplementations, but
 not copied disk images or extracted binary payloads until licensing is resolved.
 
 Before each extraction campaign:
 
-    sha256sum /mnt/scratch/downloads/Acornsoft_Chess_V2.1.ssd
-    sha256sum /mnt/scratch/downloads/Computer_Concepts_Chess_DThompson.ssd
+    sha256sum /mnt/scratch/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd
+    sha256sum /mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd
 
 The output must match `SOURCE_MANIFEST.json`.
 
@@ -85,10 +84,12 @@ Regenerate the corpus with:
 - [x] Distribution boundary recorded.
 - [x] Common move/evidence contract defined.
 - [x] Initial position corpus generated and JSON-validated.
-- [ ] User review/acceptance of this checkpoint.
+- [x] User review/acceptance of this checkpoint.
 
 ## Next stage after acceptance
 
+Phase 1 is handed to Paperclip as `TAU-88` under the day-schedule P40 coder.
 Install or build the selected analysis tools outside the repository, then run
-one smoke-load per SSD. Record the DFS catalogue, startup screen, board setup,
-and one human/computer turn for each backend before attempting disassembly.
+one smoke-load per SSD after the toolchain task and Codex review are accepted.
+Record the DFS catalogue, startup screen, board setup, and one
+human/computer turn for each backend before attempting disassembly.

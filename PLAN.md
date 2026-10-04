@@ -29,9 +29,9 @@ stay in their respective directories.
 
 Reference inputs on compute01:
 
-- `/mnt/scratch/downloads/Acornsoft_Chess_V2.1.ssd`
+- `/mnt/scratch/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd`
   - SHA-256: `72d14af1fced97aca88e6532fac54b213b7b81b819a5a8a435be39837afb037b`
-- `/mnt/scratch/downloads/Computer_Concepts_Chess_DThompson.ssd`
+- `/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd`
   - SHA-256: `80120f0f346194a388ebb7152d9970ec635612fee38b733d7002f113b941eb95`
 
 ## Current integration facts
@@ -227,7 +227,7 @@ For every match retain:
 
 ## Immediate next chunk
 
-Complete Phase 0 only: select the emulator/disassembler workflow, confirm both
-source images, define the common move/evidence contract, and produce the first
-Acornsoft and Thompson position corpus. Do not modify Punchess or implement a
-P40 client until that design checkpoint is reviewed.
+Phase 0 is accepted. The first Phase 1 chunk is the Paperclip-managed
+`phase1-toolchain` task on the day-schedule P40 coder. Do not queue the
+dependent smoke-load task until the toolchain result passes Codex review.
+Do not modify Punchess or implement a P40 client during this chunk.

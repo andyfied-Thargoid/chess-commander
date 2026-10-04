@@ -1,0 +1,18 @@
+{
+  "schema": "chess-commander.paperclip-review.v1",
+  "task_id": "phase1-acornsoft-smoke-load",
+  "idempotency_key": "chess:phase1:acornsoft-smoke-load",
+  "branch": "p40/phase1-acornsoft-smoke-load",
+  "round": 1,
+  "decision": "fix_required",
+  "checked": ["diff_scope", "tests", "source_boundary", "evidence"],
+  "findings": [
+    "The smoke-load report does not identify the emulator version."
+  ],
+  "requested_fixes": [
+    "Add the exact emulator version and build commit to the evidence report."
+  ],
+  "evidence": [
+    "codex-review.md"
+  ]
+}

@@ -1,0 +1,168 @@
+{
+  "schema": "chess-commander.paperclip-task-set.v1",
+  "tasks": [
+    {
+      "schema": "chess-commander.paperclip-task.v1",
+      "task_id": "phase1-toolchain",
+      "parent_task_id": "paperclip-chess-phase1",
+      "idempotency_key": "chess:phase1:toolchain",
+      "title": "Install and qualify the Phase 1 analysis toolchain",
+      "phase": "phase1",
+      "kind": "install",
+      "repository": {
+        "owner": "andyfied-Thargoid",
+        "name": "chess-commander",
+        "base_branch": "main",
+        "work_branch": "p40/phase1-toolchain",
+        "allowed_paths": ["tools/", "evidence/"]
+      },
+      "worker": {"runtime": "p40", "mode": "coder"},
+      "resources": {"required": ["p40"], "max_concurrency": 1},
+      "dependencies": [],
+      "execution": {
+        "timeout_seconds": 1800,
+        "retry": {"max_attempts": 1, "same_idempotency_key": true},
+        "on_ambiguous": "reconcile_before_retry"
+      },
+      "inputs": {
+        "source_manifest": "SOURCE_MANIFEST.json",
+        "source_images": [
+          {
+            "backend": "acornsoft",
+            "path": "/mnt/scratch/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd",
+            "sha256": "72d14af1fced97aca88e6532fac54b213b7b81b819a5a8a435be39837afb037b"
+          },
+          {
+            "backend": "thompson",
+            "path": "/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd",
+            "sha256": "80120f0f346194a388ebb7152d9970ec635612fee38b733d7002f113b941eb95"
+          }
+        ]
+      },
+      "outputs": [
+        "Tool versions and build commits",
+        "Reproducible toolchain readiness report"
+      ],
+      "acceptance_criteria": [
+        "B-Em, dfsimage, and bbcdisasm are available outside the repository",
+        "No source image or emulator state is copied into Git",
+        "The report records commands, versions, and failures"
+      ],
+      "review": {
+        "required": true,
+        "runtime": "codex",
+        "mode": "review",
+        "fix_runtime": "p40",
+        "max_fix_rounds": 2,
+        "failure_action": "return_to_p40"
+      }
+    },
+    {
+      "schema": "chess-commander.paperclip-task.v1",
+      "task_id": "phase1-acornsoft-smoke-load",
+      "parent_task_id": "paperclip-chess-phase1",
+      "idempotency_key": "chess:phase1:acornsoft-smoke-load",
+      "title": "Smoke-load the Acornsoft Chess reference image",
+      "phase": "phase1",
+      "kind": "assessment",
+      "repository": {
+        "owner": "andyfied-Thargoid",
+        "name": "chess-commander",
+        "base_branch": "main",
+        "work_branch": "p40/phase1-acornsoft-smoke-load",
+        "allowed_paths": ["acornsoft/", "evidence/"]
+      },
+      "worker": {"runtime": "p40", "mode": "coder"},
+      "resources": {"required": ["p40"], "max_concurrency": 1},
+      "dependencies": ["phase1-toolchain"],
+      "execution": {
+        "timeout_seconds": 1800,
+        "retry": {"max_attempts": 1, "same_idempotency_key": true},
+        "on_ambiguous": "reconcile_before_retry"
+      },
+      "inputs": {
+        "source_manifest": "SOURCE_MANIFEST.json",
+        "source_images": [
+          {
+            "backend": "acornsoft",
+            "path": "/mnt/scratch/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd",
+            "sha256": "72d14af1fced97aca88e6532fac54b213b7b81b819a5a8a435be39837afb037b"
+          }
+        ]
+      },
+      "outputs": [
+        "Acornsoft DFS catalogue",
+        "Acornsoft startup and one computer-turn evidence"
+      ],
+      "acceptance_criteria": [
+        "The SSD hash is rechecked before launch",
+        "Startup, board setup, human input, and one computer move are recorded",
+        "The evidence identifies known facts versus inferred behavior"
+      ],
+      "review": {
+        "required": true,
+        "runtime": "codex",
+        "mode": "review",
+        "fix_runtime": "p40",
+        "max_fix_rounds": 2,
+        "failure_action": "return_to_p40"
+      }
+    },
+    {
+      "schema": "chess-commander.paperclip-task.v1",
+      "task_id": "phase1-copilot-fallback",
+      "parent_task_id": "paperclip-chess-phase1",
+      "idempotency_key": "chess:phase1:copilot-fallback",
+      "title": "Repair a blocked Phase 1 task through Copilot fallback",
+      "phase": "phase1",
+      "kind": "coding",
+      "repository": {
+        "owner": "andyfied-Thargoid",
+        "name": "chess-commander",
+        "base_branch": "main",
+        "work_branch": "copilot/phase1-fallback",
+        "allowed_paths": ["tools/", "evidence/"]
+      },
+      "worker": {
+        "runtime": "copilot",
+        "mode": "coder",
+        "account": "andyfied-agent",
+        "fallback_for": "p40"
+      },
+      "resources": {"required": ["copilot:andyfied-agent"], "max_concurrency": 1},
+      "dependencies": ["phase1-toolchain"],
+      "execution": {
+        "timeout_seconds": 1800,
+        "retry": {"max_attempts": 1, "same_idempotency_key": true},
+        "on_ambiguous": "reconcile_before_retry"
+      },
+      "inputs": {
+        "source_manifest": "SOURCE_MANIFEST.json",
+        "source_images": [
+          {
+            "backend": "acornsoft",
+            "path": "/mnt/scratch/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd",
+            "sha256": "72d14af1fced97aca88e6532fac54b213b7b81b819a5a8a435be39837afb037b"
+          }
+        ]
+      },
+      "outputs": [
+        "Bounded repair diff",
+        "Copilot account and command evidence"
+      ],
+      "acceptance_criteria": [
+        "The repair stays within the task branch and allowed paths",
+        "The Copilot account is identified without exposing credentials",
+        "The result is returned to Codex for a fresh review"
+      ],
+      "review": {
+        "required": true,
+        "runtime": "codex",
+        "mode": "review",
+        "fix_runtime": "copilot",
+        "max_fix_rounds": 2,
+        "failure_action": "return_to_copilot"
+      }
+    }
+  ]
+}

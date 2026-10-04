@@ -1,0 +1,15 @@
+{
+  "schema": "chess-commander.paperclip-review.v1",
+  "task_id": "phase1-toolchain",
+  "idempotency_key": "chess:phase1:toolchain",
+  "branch": "p40/phase1-toolchain",
+  "round": 1,
+  "decision": "pass",
+  "checked": ["diff_scope", "tests", "source_boundary", "evidence"],
+  "findings": [],
+  "requested_fixes": [],
+  "evidence": [
+    "toolchain-readiness.md",
+    "commands-and-versions.txt"
+  ]
+}

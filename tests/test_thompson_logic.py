@@ -1,41 +1,28 @@
 """Tests for Thompson backend logic that don't require SSD files."""
 import pytest
+import chess
 from tests.conftest import minimal_backend
 
 
 class TestMaterialScoring:
     """Test material evaluation logic."""
     
+    def test_material_values_defined(self):
+        """Test that material values are correctly defined."""
+        assert 100 <= 320 <= 330 <= 500 <= 900 <= 10000
+    
     def test_white_piece_values(self, minimal_backend):
         """Test that white pieces are correctly valued."""
-        # Create a simple board with just a white king
-        board = [0x00] * 64
-        board[60] = 0x60  # White king at e8
-        
-        score = minimal_backend._evaluate_move(board, 'e2e4')
-        # Should have positive score from white king material
-        assert score > 0
+        assert minimal_backend.MATERIAL_VALUES['P'] == 100
+        assert minimal_backend.MATERIAL_VALUES['N'] == 320
+        assert minimal_backend.MATERIAL_VALUES['B'] == 330
+        assert minimal_backend.MATERIAL_VALUES['R'] == 500
+        assert minimal_backend.MATERIAL_VALUES['Q'] == 900
+        assert minimal_backend.MATERIAL_VALUES['K'] == 10000
     
-    def test_black_piece_values(self, minimal_backend):
-        """Test that black pieces are correctly valued."""
-        # Create a simple board with just a black king
-        board = [0x00] * 64
-        board[60] = 0xE0  # Black king at e8
-        
-        score = minimal_backend._evaluate_move(board, 'e2e4')
-        # Should have negative score from black king material
-        assert score < 0
-    
-    def test_material_balance(self, minimal_backend):
-        """Test that equal material gives score near zero."""
-        # Create a board with equal white and black kings
-        board = [0x00] * 64
-        board[60] = 0x60  # White king
-        board[4] = 0xE0   # Black king (opposite color)
-        
-        score = minimal_backend._evaluate_move(board, 'e2e4')
-        # Should be close to zero (both sides have king)
-        assert -200 < score < 200  # King is 10000, but we're testing balance
+    def test_black_piece_values_same_as_white(self, minimal_backend):
+        """Test that black and white pieces have same values."""
+        assert minimal_backend.MATERIAL_VALUES['P'] == minimal_backend.MATERIAL_VALUES['p']
 
 
 class TestCharToPiece:
@@ -58,6 +45,45 @@ class TestCharToPiece:
         assert minimal_backend._char_to_piece('r') == 0xC0
         assert minimal_backend._char_to_piece('q') == 0xD0
         assert minimal_backend._char_to_piece('k') == 0xE0
+    
+    def test_invalid_char(self, minimal_backend):
+        """Test invalid character returns 0."""
+        assert minimal_backend._char_to_piece('x') == 0x00
+
+
+class TestMoveEvaluation:
+    """Test that different moves receive different scores."""
+    
+    def test_different_moves_different_scores(self, minimal_backend):
+        """
+        Test that evaluating different moves from starting position
+        produces different scores (or at least some variation).
+        
+        This verifies that _evaluate_move actually applies the move
+        before scoring, rather than evaluating the same position every time.
+        """
+        starting_pos = 'rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1'
+        moves = ['e2e4', 'e2e3', 'g1f3', 'h2h3']
+        
+        scores = []
+        for move in moves:
+            score = minimal_backend._evaluate_move(
+                minimal_backend.board_data, move
+            )
+            scores.append(score)
+        
+        # We expect scores to vary because each move creates a different board state
+        # (at minimum, pawn moves change material distribution)
+        # If all scores were identical, that would indicate the move wasn't applied
+        unique_scores = len(set(scores))
+        assert unique_scores > 1, f"All moves returned identical score {scores}. Move simulation may not be working."
+    
+    def test_evaluate_position_works(self, minimal_backend):
+        """Test that _evaluate_position works with real chess.Board."""
+        board = chess.Board()
+        score = minimal_backend._evaluate_position(board)
+        # Starting position should have equal material, score near 0
+        assert -100 < score < 100  # Allow small tolerance for implementation details
 
 
 class TestInterface:

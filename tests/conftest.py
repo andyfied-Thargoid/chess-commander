@@ -29,26 +29,18 @@ def minimal_backend():
     """
     Provide a minimal backend for testing logic without SSD file.
     
-    This creates a backend that doesn't load actual board data,
-    allowing us to test the evaluation logic and interfaces.
+    This creates a ThompsonChessBackend instance without loading
+    the actual SSD file, allowing us to test the evaluation logic.
     """
-    # Create a minimal mock-like backend for testing
-    class MinimalThompsonBackend:
-        backend_type = None
-        source_sha256 = "test-sha256"
-        strategy_revision = "test-v0"
-        MATERIAL_VALUES = {
-            'P': 100, 'N': 320, 'B': 330, 
-            'R': 500, 'Q': 900, 'K': 10000
-        }
-        
-        def _char_to_piece(self, char: str) -> int:
-            encoding = {
-                'P': 0x10, 'N': 0x20, 'B': 0x30,
-                'R': 0x40, 'Q': 0x50, 'K': 0x60,
-                'p': 0x90, 'n': 0xA0, 'b': 0xB0,
-                'r': 0xC0, 'q': 0xD0, 'k': 0xE0
-            }
-            return encoding.get(char, 0x00)
-    
-    return MinimalThompsonBackend()
+    # Create instance without calling __init__
+    backend = ThompsonChessBackend.__new__(ThompsonChessBackend)
+    backend.backend_type = BackendType.THOMPSON
+    backend.source_sha256 = "test-sha256"
+    backend.strategy_revision = "test-v0"
+    # Set up minimal board data for testing (64-byte array of zeros)
+    backend.board_data = [0x00] * 64
+    backend.MATERIAL_VALUES = {
+        'P': 100, 'N': 320, 'B': 330,
+        'R': 500, 'Q': 900, 'K': 10000
+    }
+    return backend

@@ -1,0 +1,22 @@
+# Chess Commander Configuration
+
+backends:
+  acornsoft:
+    enabled: false
+    source_path: /mnt/scratch/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd
+    strategy_revision: oracle-v0
+    timeout_ms: 30000
+  
+  thompson:
+    enabled: true
+    source_path: /mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd
+    strategy_revision: oracle-v0
+    timeout_ms: 30000
+
+punchess:
+  url: http://localhost:8000
+  timeout_ms: 60000
+
+logging:
+  level: INFO
+  file: logs/chess-commander.log

@@ -227,16 +227,24 @@ class ThompsonChessBackend(ChessBackend):
     
     def _get_bitboard_candidates(
         self,
-        board: List[int],
+        position: str,
         legal_moves: List[str]
     ) -> List[str]:
         """
         Get candidate moves using Thompson's bitboard attack tables.
         
-        Filters legal moves to those that are in Thompson's candidate set.
+        Note: This is currently a placeholder that returns all legal moves.
+        The full Thompson bitboard filtering is not yet implemented.
+        
+        Args:
+            position: FEN string of current position
+            legal_moves: List of legal UCI moves
+            
+        Returns:
+            List of candidate moves (currently all legal moves)
         """
         # For now, return all legal moves
-        # TODO: Implement actual bitboard candidate filtering
+        # TODO: Implement actual bitboard candidate filtering from Thompson's tables
         return legal_moves
     
     def _evaluate_candidates(
@@ -277,13 +285,18 @@ class ThompsonChessBackend(ChessBackend):
             move: Move in UCI format to evaluate
             
         This applies the move to the given position, then scores the resulting
-        position from the opponent's perspective (for minimax).
+        position from the perspective of the side that just moved.
+        
+        For minimax: we want to maximize our score, so we score from our perspective.
         """
         # Parse the actual position from the parameter
         try:
             chess_board = chess.Board(position_fen)
         except ValueError:
             return 0.0  # Invalid FEN
+        
+        # Get whose turn it is BEFORE the move
+        mover_is_white = chess_board.turn
         
         # Parse and validate the move
         try:
@@ -302,9 +315,12 @@ class ThompsonChessBackend(ChessBackend):
         # Score from white's perspective
         score = self._evaluate_position(test_board)
         
-        # Return negated score (from opponent's perspective after the move)
-        # For minimax: if we're white and made a move, we want to minimize opponent's score
-        return -score
+        # If White moved, return score as-is (White wants high score)
+        # If Black moved, negate score (Black wants low score, which is high for Black)
+        if mover_is_white:
+            return score
+        else:
+            return -score
     
     def _evaluate_position(self, board: chess.Board) -> float:
         """

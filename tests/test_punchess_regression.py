@@ -54,9 +54,10 @@ class TestPunchessClientRegression:
         client = PunchessChessClient(punchess_url="http://localhost:8000", backend=mock_backend)
         
         # Mock the underlying HTTP client
-        client.client = MagicMock()
-        client.client.join_game = AsyncMock(return_value=True)
-        client.client.get_game_status = AsyncMock(return_value=Mock(
+        mock_join = AsyncMock(return_value=True)
+        
+        # First call returns playing status, second call returns checkmate
+        play_status = Mock(
             checkmate=False,
             stalemate=False,
             insufficient_material=False,
@@ -64,8 +65,33 @@ class TestPunchessClientRegression:
             white_time_left=300000,
             black_time_left=300000,
             white_increment=0
-        ))
-        client.client.submit_move = AsyncMock(return_value=True)
+        )
+        
+        checkmate_status = Mock(
+            checkmate=True,
+            stalemate=False,
+            insufficient_material=False,
+            fen='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1',
+            white_time_left=300000,
+            black_time_left=300000,
+            white_increment=0
+        )
+        
+        call_count = [0]
+        def get_game_status_side_effect(game_id):
+            call_count[0] += 1
+            if call_count[0] == 1:
+                return play_status
+            else:
+                return checkmate_status
+        
+        mock_get_status = AsyncMock(side_effect=get_game_status_side_effect)
+        mock_submit = AsyncMock(return_value=True)
+        
+        client.client = MagicMock()
+        client.client.join_game = mock_join
+        client.client.get_game_status = mock_get_status
+        client.client.submit_move = mock_submit
         
         # Call play_game - this is what was failing before
         async def run_test():

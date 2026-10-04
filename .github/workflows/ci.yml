@@ -26,7 +26,10 @@ jobs:
     
     - name: Run tests
       run: |
+        set +e  # Don't exit on error
         test_output=$(python3 -m pytest tests/ -v --tb=short 2>&1)
+        exit_code=$?
+        
         echo "$test_output"
         
         # Check for failures
@@ -36,14 +39,15 @@ jobs:
         fi
         
         # Check for excessive skips
-        skipped_count=$(echo "$test_output" | grep -o "[0-9]* skipped" | grep -o "[0-9]*" || echo "0")
-        total_count=$(echo "$test_output" | grep -o "[0-9]* collected" | grep -o "[0-9]*" || echo "0")
+        skipped_count=$(echo "$test_output" | grep -oE "[0-9]+ skipped" | grep -oE "[0-9]+" || echo "0")
+        total_count=$(echo "$test_output" | grep -oE "[0-9]+ collected" | grep -oE "[0-9]+" || echo "0")
         
         if [ "$total_count" -gt 0 ] && [ "$skipped_count" -ge "$total_count" ]; then
           echo "ERROR: All tests were skipped. Set THOMPSON_SSD_PATH or add more non-SSD tests."
           exit 1
         fi
         
-        echo "Tests completed: $total_count collected, $skipped_count skipped"
+        echo "Tests completed: $total_count collected, $skipped_count skipped, exit code: $exit_code"
+        exit $exit_code
       env:
         THOMPSON_SSD_PATH: ${{ secrets.THOMPSON_SSD_PATH }}

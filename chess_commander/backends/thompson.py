@@ -6,6 +6,7 @@ move selection using Thompson's bitboard algorithm.
 """
 
 import time
+import chess
 from typing import List, Optional
 from dataclasses import dataclass
 
@@ -114,7 +115,7 @@ class ThompsonChessBackend(ChessBackend):
         Choose a move using Thompson's algorithm.
         
         Args:
-            position: FEN string
+            position: FEN string of current position
             legal_moves: List of legal UCI moves
             clock: Time control dict
             request_id: Unique request identifier
@@ -125,16 +126,16 @@ class ThompsonChessBackend(ChessBackend):
         start_time = time.time()
         
         try:
-            # Parse position to board state
-            board = self._fen_to_board(position)
+            # Get candidate moves (currently returns all legal moves)
+            candidates = self._get_bitboard_candidates(position, legal_moves)
             
-            # Get candidate moves from bitboard tables
-            candidates = self._get_bitboard_candidates(board, legal_moves)
-            
-            # Evaluate candidates
-            scored_moves = self._evaluate_candidates(board, candidates)
+            # Evaluate candidates (now uses actual position)
+            scored_moves = self._evaluate_candidates(position, candidates)
             
             # Select best move
+            if not scored_moves:
+                raise ValueError("No candidates to evaluate")
+                
             best_score, best_move = scored_moves[0]
             
             latency_ms = int((time.time() - start_time) * 1000)
@@ -240,61 +241,69 @@ class ThompsonChessBackend(ChessBackend):
     
     def _evaluate_candidates(
         self,
-        board: List[int],
+        position_fen: str,
         candidates: List[str]
     ) -> List[tuple]:
         """
         Evaluate candidate moves using Thompson's scoring.
         
+        Args:
+            position_fen: FEN string of current position
+            candidates: List of candidate moves to evaluate
+            
         Returns list of (score, move) tuples sorted by score.
         """
         scored_moves = []
         
         for move in candidates:
-            score = self._evaluate_move(board, move)
+            score = self._evaluate_move(position_fen, move)
             scored_moves.append((score, move))
         
-        # Sort by score (descending)
+        # Sort by score descending (higher scores = better moves)
         scored_moves.sort(key=lambda x: -x[0])
         
         return scored_moves
     
     def _evaluate_move(
         self,
-        board: List[int],
+        position_fen: str,
         move: str
     ) -> float:
         """
-        Evaluate a move by simulating it and scoring the resulting position.
+        Evaluate a move by simulating it on the given position and scoring.
         
-        This is a simplified evaluation that:
-        1. Applies the move to the board
-        2. Evaluates material balance from opponent's perspective (negated)
-        3. Returns the score
-        
-        TODO: Add mobility, center control, pawn structure evaluation
+        Args:
+            position_fen: FEN string of the current position
+            move: Move in UCI format to evaluate
+            
+        This applies the move to the given position, then scores the resulting
+        position from the opponent's perspective (for minimax).
         """
-        import chess
+        # Parse the actual position from the parameter
+        try:
+            chess_board = chess.Board(position_fen)
+        except ValueError:
+            return 0.0  # Invalid FEN
         
-        # Parse move and apply to board
-        chess_board = chess.Board('rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1')
-        uci_move = chess.Move.from_uci(move)
+        # Parse and validate the move
+        try:
+            uci_move = chess.Move.from_uci(move)
+        except ValueError:
+            return 0.0  # Invalid move
         
-        # Try to apply the move
+        # Check if move is legal in this position
         if uci_move not in chess_board.legal_moves:
-            return 0.0  # Invalid move, return neutral score
+            return 0.0
         
-        # Make a copy and apply the move
+        # Copy board and apply the move
         test_board = chess_board.copy()
         test_board.push(uci_move)
         
-        # Score from the perspective of the side that just moved
-        # (so if white moves, we score from white's perspective)
-        # But we negate it because we want the opponent's evaluation
+        # Score from white's perspective
         score = self._evaluate_position(test_board)
         
-        # Negate because we're evaluating from the perspective of the side AFTER the move
-        # Actually, for minimax, we want: current_player_score = -opponent_score
+        # Return negated score (from opponent's perspective after the move)
+        # For minimax: if we're white and made a move, we want to minimize opponent's score
         return -score
     
     def _evaluate_position(self, board: chess.Board) -> float:
@@ -315,10 +324,26 @@ class ThompsonChessBackend(ChessBackend):
             if piece is None:
                 continue
             
+            # python-chess uses integer piece types: 1=P, 2=N, 3=B, 4=R, 5=Q, 6=K
             piece_type = piece.piece_type
             is_white = piece.color == chess.WHITE
             
-            value = self.MATERIAL_VALUES.get(piece_type, 0)
+            # Map integer piece types to our material values
+            # We use uppercase keys for consistency, but map from integers
+            if piece_type == chess.PAWN:
+                value = self.MATERIAL_VALUES['P']
+            elif piece_type == chess.KNIGHT:
+                value = self.MATERIAL_VALUES['N']
+            elif piece_type == chess.BISHOP:
+                value = self.MATERIAL_VALUES['B']
+            elif piece_type == chess.ROOK:
+                value = self.MATERIAL_VALUES['R']
+            elif piece_type == chess.QUEEN:
+                value = self.MATERIAL_VALUES['Q']
+            elif piece_type == chess.KING:
+                value = self.MATERIAL_VALUES['K']
+            else:
+                value = 0
             
             if is_white:
                 white_material += value
@@ -338,13 +363,13 @@ class ThompsonChessBackend(ChessBackend):
         legal_moves = [move.uci() for move in board.legal_moves]
         
         candidates = self._get_bitboard_candidates(
-            self._fen_to_board(position),
+            position,
             legal_moves
         )
         
         # Evaluate and sort
         scored = self._evaluate_candidates(
-            self._fen_to_board(position),
+            position,
             candidates
         )
         

@@ -2,6 +2,9 @@
 import os
 import pytest
 
+from chess_commander.backends.thompson import ThompsonChessBackend
+from chess_commander.backends.interface import BackendType
+
 # Use SSD path from environment variable, or use a minimal test path
 # For CI, if THOMPSON_SSD_PATH is not set, we'll skip SSD-dependent tests
 SSD_PATH = os.environ.get(
@@ -13,8 +16,6 @@ SSD_PATH = os.environ.get(
 @pytest.fixture
 def backend():
     """Provide a Thompson backend instance for tests."""
-    from chess_commander.backends.thompson import ThompsonChessBackend
-    
     if SSD_PATH is None or not os.path.exists(SSD_PATH):
         pytest.skip(f"SSD file not found at {SSD_PATH}. Set THOMPSON_SSD_PATH environment variable.")
     

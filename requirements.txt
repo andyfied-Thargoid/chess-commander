@@ -2,6 +2,7 @@
 
 # Core dependencies
 python-chess>=1.999  # Chess board and move generation
+pyyaml>=6.0         # Server configuration parsing
 
 # Optional: for async Punchess integration
 aiohttp>=3.8.0

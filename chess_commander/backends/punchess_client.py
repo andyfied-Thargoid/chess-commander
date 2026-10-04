@@ -313,8 +313,7 @@ class PunchessChessClient:
                     "white_ms": status.white_time_left or 300000,
                     "black_ms": status.black_time_left or 300000,
                     "increment_ms": status.white_increment or 0
-                },
-                strategy_revision=self.backend.strategy_revision
+                }
             )
             
             if move_result.status != "ok":

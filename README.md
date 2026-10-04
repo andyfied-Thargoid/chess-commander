@@ -87,9 +87,6 @@ python3 -m pytest tests/ -v
 ## Documentation
 
 - [chess-commander-2026-10-04](references/chess-commander-2026-10-04.md) — Project reference
-- [PHASE-0-COMPLETION.md](PHASE-0-COMPLETION.md) — Phase 0 summary
-- [PHASE-1-SMOKE-TESTS.md](PHASE-1-SMOKE-TESTS.md) — Initial test results
-- [PHASE-2-COMPLETION.md](PHASE-2-COMPLETION.md) — Phase 2 summary
 
 ## Next Steps
 

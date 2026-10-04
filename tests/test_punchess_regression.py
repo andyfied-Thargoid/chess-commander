@@ -87,11 +87,23 @@ class TestPunchessClientRegression:
         
         mock_get_status = AsyncMock(side_effect=get_game_status_side_effect)
         mock_submit = AsyncMock(return_value=True)
+        mock_get_report = AsyncMock(return_value=Mock(
+            game_id="test-game-123",
+            white_fide_rating=1200,
+            black_fide_rating=1200,
+            fen='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1',
+            pgns=[],
+            moves=[],
+            evaluation=None,
+            time_analysis=None,
+            backend=BackendType.THOMPSON
+        ))
         
         client.client = MagicMock()
         client.client.join_game = mock_join
         client.client.get_game_status = mock_get_status
         client.client.submit_move = mock_submit
+        client.client.get_game_report = mock_get_report
         
         # Call play_game - this is what was failing before
         async def run_test():

@@ -81,32 +81,39 @@ class TestMoveEvaluation:
         unique_scores = len(set(scores))
         assert unique_scores == 1, f"Expected all non-capture moves to have same score, but got: {scores}"
     
-    def test_capture_gains_material_positive_score(self, minimal_backend):
+    def test_white_capture_gains_material(self, minimal_backend):
         """
-        Test that a capture that wins material gets a positive score for White.
+        Test that White capture that wins material gets positive score.
         
         Position: White pawn on e5 can capture Black pawn on d6
-        After capture: White is up one pawn (+100 material)
+        After capture: White is up one pawn (+100 material from White perspective)
+        
+        FEN: 7k/8/3p4/4P3/8/8/8/K7 w - - 0 1
+        - White king on a1
+        - White pawn on e5
+        - Black pawn on d6
+        - Black king on h8
         """
-        # White to move, pawn on e5 can capture on d6
-        position = '8/8/3p4/3P4/8/8/8/8 w - - 0 1'
-        capture_move = 'd5e6'  # White pawn captures on e6
+        position = '7k/8/3p4/4P3/8/8/8/K7 w - - 0 1'
+        capture = 'e5d6'  # White pawn captures on d6
         
-        score = minimal_backend._evaluate_move(position, capture_move)
+        score = minimal_backend._evaluate_move(position, capture)
         
-        # White captures a pawn (+100), so score should be positive
-        assert score == 100, f"Expected +100 for capturing a pawn, got {score}"
+        # White captures a pawn, gaining +100 material (from White perspective)
+        assert score == 100, f"Expected +100 for White capturing a pawn, got {score}"
     
-    def test_capture_ranked_above_quiet_move(self, minimal_backend):
+    def test_white_capture_ranked_above_quiet(self, minimal_backend):
         """
-        Test that a winning capture is ranked higher than a quiet move.
+        Test that a winning capture ranks higher than a quiet move.
         
-        Position: White can either capture a pawn or make a quiet move
+        Position: White can either capture the d6 pawn or push e6
         The capture should score higher (+100 vs 0).
+        
+        FEN: 7k/8/3p4/4P3/8/8/8/K7 w - - 0 1
         """
-        position = '8/8/3p4/3P4/8/8/8/8 w - - 0 1'
-        capture = 'd5e6'  # Capture, gains +100
-        quiet = 'd5d6'    # Quiet push, gains 0
+        position = '7k/8/3p4/4P3/8/8/8/K7 w - - 0 1'
+        capture = 'e5d6'  # Capture, gains +100
+        quiet = 'e5e6'    # Quiet push, gains 0
         
         capture_score = minimal_backend._evaluate_move(position, capture)
         quiet_score = minimal_backend._evaluate_move(position, quiet)
@@ -116,18 +123,28 @@ class TestMoveEvaluation:
         assert capture_score == 100, f"Expected capture to score +100, got {capture_score}"
         assert quiet_score == 0, f"Expected quiet move to score 0, got {quiet_score}"
     
-    def test_capture_by_black_negative_score(self, minimal_backend):
+    def test_black_capture_gains_material_positive(self, minimal_backend):
         """
-        Test that when Black captures, the score is negative (from White perspective).
+        Test that when Black captures a pawn, the score is +100 (from Black perspective).
+        
+        The evaluator returns scores from the mover's perspective:
+        - If Black captures, we return positive score (good for Black)
+        - This is consistent with how minimax works: we maximize our own score
+        
+        FEN: 7k/8/3p4/4P3/8/8/8/K7 b - - 0 1
+        - White king on a1
+        - White pawn on e5
+        - Black pawn on d6
+        - Black king on h8
         """
-        # Black to move, pawn on d6 can capture White pawn on e5
-        position = '8/8/3p4/3P4/8/8/8/8 b - - 0 1'
+        position = '7k/8/3p4/4P3/8/8/8/K7 b - - 0 1'
         capture = 'd6e5'  # Black pawn captures on e5
         
         score = minimal_backend._evaluate_move(position, capture)
         
-        # Black captures a pawn, White loses material, so score should be negative
-        assert score == -100, f"Expected -100 for Black capturing a pawn, got {score}"
+        # Black captures a pawn, gaining +100 material (from Black perspective)
+        # The function returns mover-perspective scores
+        assert score == 100, f"Expected +100 for Black capturing a pawn, got {score}"
     
     def test_evaluate_position_works(self, minimal_backend):
         """Test that _evaluate_position works with real chess.Board."""

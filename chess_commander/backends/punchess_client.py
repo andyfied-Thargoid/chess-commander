@@ -308,9 +308,6 @@ class PunchessChessClient:
             print(f"Game {game_id}: Position {position}")
             print(f"Legal moves: {legal_moves[:5]}...")
             
-            # Fix: Use correct increment for the side to move
-            increment_ms = status.white_increment if board.turn == chess.WHITE else status.black_increment
-            
             move_result = self.backend.choose_move(
                 request_id=game_id,
                 position=position,

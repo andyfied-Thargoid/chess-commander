@@ -31,7 +31,7 @@ class TestPunchessStrategyRevisionRegression:
         return backend
     
     @pytest.fixture
-    async def client(self, mock_backend):
+    def client(self, mock_backend):
         """Create a PunchessChessClient with mocked client."""
         client = PunchessChessClient(
             punchess_url="http://test-server:8000",

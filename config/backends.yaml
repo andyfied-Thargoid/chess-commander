@@ -1,0 +1,8 @@
+backends:
+  thompson:
+    enabled: true
+    source_path: /mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd
+    strategy_revision: oracle-v0
+
+punchess:
+  url: http://localhost:8000

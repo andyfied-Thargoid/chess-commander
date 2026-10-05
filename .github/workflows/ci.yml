@@ -1,0 +1,53 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+    branches: [main, master]
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    
+    steps:
+    - uses: actions/checkout@v4
+    
+    - name: Set up Python
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+    
+    - name: Install dependencies
+      run: |
+        pip install --upgrade pip
+        pip install -r requirements.txt
+        pip install pytest pytest-asyncio
+    
+    - name: Run tests
+      run: |
+        set +e  # Don't exit on error
+        test_output=$(python3 -m pytest tests/ -v --tb=short 2>&1)
+        exit_code=$?
+        
+        echo "$test_output"
+        
+        # Check for failures
+        if echo "$test_output" | grep -q "^FAILED"; then
+          echo "ERROR: Tests failed"
+          exit 1
+        fi
+        
+        # Check for excessive skips - parse "collected X items" format
+        total_count=$(echo "$test_output" | grep -oE "collected [0-9]+ items" | grep -oE "[0-9]+" || echo "0")
+        skipped_count=$(echo "$test_output" | grep -oE "[0-9]+ skipped" | grep -oE "[0-9]+" || echo "0")
+        
+        if [ "$total_count" -gt 0 ] && [ "$skipped_count" -ge "$total_count" ]; then
+          echo "ERROR: All tests were skipped ($skipped_count skipped of $total_count collected). Set THOMPSON_SSD_PATH or add more non-SSD tests."
+          exit 1
+        fi
+        
+        echo "Tests completed: $total_count collected, $skipped_count skipped, exit code: $exit_code"
+        exit $exit_code
+      env:
+        THOMPSON_SSD_PATH: ${{ secrets.THOMPSON_SSD_PATH }}

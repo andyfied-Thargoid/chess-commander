@@ -318,23 +318,26 @@ class PunchessChessClient:
                 clock={
                     "white_ms": status.white_time_left or 300000,
                     "black_ms": status.black_time_left or 300000,
-                    "increment_ms": increment_ms
+                    "increment_ms": (status.white_increment if board.turn == chess.WHITE else status.black_increment) or 0
                 }
             )
             
             if move_result.status != "ok":
                 print(f"Backend error: {move_result.evidence.failure_reason}")
-                break
+                return None
             
-            move_uci = move_result.move_uci
-            print(f"Choosing: {move_uci}")
+            attempted_move = move_result.move_uci
+            print(f"Choosing: {attempted_move}")
             
             # Submit move
-            success = await self.client.submit_move(game_id, move_uci)
+            success = await self.client.submit_move(game_id, attempted_move)
             
             if not success:
-                print(f"Failed to submit move {move_uci}")
-                break
+                print(f"Failed to submit move {attempted_move}")
+                return None
+            
+            # Only update move_uci after successful submission
+            move_uci = attempted_move
             
             # Check if we won
             if move_result.evidence.selected_move_uci == move_uci:

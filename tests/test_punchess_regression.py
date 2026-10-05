@@ -1,123 +1,131 @@
-"""Regression test for Punchess client strategy_revision TypeError."""
+"""Regression test for PR #3: strategy_revision TypeError fix."""
 import pytest
-import asyncio
-from unittest.mock import Mock, AsyncMock, MagicMock
+from unittest.mock import AsyncMock, MagicMock, Mock
+import sys
+import os
+
+# Add parent directory to path for imports
+sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+from chess_commander.backends.punchess_client import PunchessChessClient
 
 
-class TestPunchessClientRegression:
-    """Test that Punchess client no longer passes strategy_revision to backend."""
+class TestPunchessStrategyRevisionRegression:
+    """Test that play_game() no longer passes strategy_revision to backend.choose_move()."""
     
-    def test_play_game_does_not_pass_strategy_revision(self):
+    @pytest.fixture
+    def mock_backend(self):
+        """Create a mock backend with the correct interface."""
+        backend = MagicMock()
+        backend.backend_type = MagicMock()
+        backend.backend_type.value = "test-backend"
+        
+        # Mock choose_move to return a valid result
+        mock_result = MagicMock()
+        mock_result.status = "ok"
+        mock_result.move_uci = "e2e4"
+        mock_result.evidence = MagicMock()
+        mock_result.evidence.selected_move_uci = "e2e4"
+        
+        backend.choose_move = MagicMock(return_value=mock_result)
+        return backend
+    
+    @pytest.fixture
+    async def client(self, mock_backend):
+        """Create a PunchessChessClient with mocked client."""
+        client = PunchessChessClient(
+            punchess_url="http://test-server:8000",
+            backend=mock_backend
+        )
+        
+        # Mock the inner client
+        client.client = MagicMock()
+        client.client.join_game = AsyncMock(return_value=True)
+        client.client.get_game_report = AsyncMock(return_value=None)
+        client.client.submit_move = AsyncMock(return_value=True)
+        
+        return client
+    
+    @pytest.mark.asyncio
+    async def test_no_strategy_revision_passed(self, client, mock_backend):
         """
-        Regression test for TypeError in play_game().
+        Test that play_game() does not pass strategy_revision to backend.choose_move().
         
-        Before fix: PunchessChessClient.play_game() called backend.choose_move()
-        with strategy_revision= parameter, causing TypeError because the base
-        ChessBackend interface only defines:
-            choose_move(position, legal_moves, clock, request_id)
-        
-        After fix: strategy_revision parameter removed from the call.
+        This is a regression test for the issue where play_game() incorrectly passed
+        the unsupported strategy_revision parameter, causing a TypeError.
         """
-        from chess_commander.backends.punchess_client import PunchessChessClient
-        from chess_commander.backends.interface import BackendType, MoveResult, MoveEvidence
-        
-        # Create a mock backend that follows the CORRECT interface signature
-        mock_backend = Mock()
-        mock_backend.backend_type = BackendType.THOMPSON
-        
-        # Track if strategy_revision was passed (it should NOT be)
-        received_kwargs = {}
-        
-        def choose_move(position, legal_moves, clock, request_id):
-            """Mock choose_move with correct interface signature."""
-            nonlocal received_kwargs
-            received_kwargs = {
-                'position': position,
-                'legal_moves': legal_moves,
-                'clock': clock,
-                'request_id': request_id
-            }
-            return MoveResult(
-                request_id=request_id,
-                status="ok",
-                move_uci='e2e4',
-                evidence=MoveEvidence(
-                    backend=BackendType.THOMPSON,
-                    source_sha256="test",
-                    strategy_revision="test"
-                )
-            )
-        
-        mock_backend.choose_move = choose_move
-        
-        # Create PunchessChessClient (the HIGH-LEVEL client, not low-level PunchessClient)
-        client = PunchessChessClient(punchess_url="http://localhost:8000", backend=mock_backend)
-        
-        # Mock the underlying HTTP client
-        mock_join = AsyncMock(return_value=True)
-        
-        # First call returns playing status, second call returns checkmate
+        # Create a status that is NOT terminal (all 5 conditions False)
+        # Also include black_increment to test correct increment selection
         play_status = Mock(
+            game_id="test-game-123",
+            fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+            white_fide_rating=1000,
+            black_fide_rating=1000,
+            move_number=1,
+            last_move=None,
             checkmate=False,
             stalemate=False,
             insufficient_material=False,
-            fen='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1',
+            fifty_move_rule=False,  # NEW: Was missing, causing early exit
+            threefold_repetition=False,  # NEW: Was missing, causing early exit
             white_time_left=300000,
             black_time_left=300000,
-            white_increment=0
+            white_increment=1000,
+            black_increment=1000  # NEW: Added to test increment selection
         )
         
-        checkmate_status = Mock(
-            checkmate=True,
-            stalemate=False,
-            insufficient_material=False,
-            fen='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1',
-            white_time_left=300000,
-            black_time_left=300000,
-            white_increment=0
-        )
-        
+        # Mock get_game_status to return non-terminal status, then terminal
         call_count = [0]
-        def get_game_status_side_effect(game_id):
+        
+        def status_side_effect(game_id):
             call_count[0] += 1
             if call_count[0] == 1:
+                # First call: non-terminal (our turn)
                 return play_status
             else:
-                return checkmate_status
+                # Second call: terminal (game over after our move)
+                return Mock(
+                    game_id="test-game-123",
+                    fen="rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR w KQkq - 0 1",
+                    white_fide_rating=1000,
+                    black_fide_rating=1000,
+                    move_number=2,
+                    last_move="e2e4",
+                    checkmate=True,  # Terminal condition
+                    stalemate=False,
+                    insufficient_material=False,
+                    fifty_move_rule=False,
+                    threefold_repetition=False,
+                    white_time_left=299000,
+                    black_time_left=300000,
+                    white_increment=1000,
+                    black_increment=1000
+                )
         
-        mock_get_status = AsyncMock(side_effect=get_game_status_side_effect)
-        mock_submit = AsyncMock(return_value=True)
-        mock_get_report = AsyncMock(return_value=Mock(
-            game_id="test-game-123",
-            white_fide_rating=1200,
-            black_fide_rating=1200,
-            fen='rnbqkbnr/pppppppp/8/8/8/8/PPPPPPPP/RNBQKBNR b KQkq - 0 1',
-            pgns=[],
-            moves=[],
-            evaluation=None,
-            time_analysis=None,
-            backend=BackendType.THOMPSON
-        ))
+        client.client.get_game_status = AsyncMock(side_effect=status_side_effect)
         
-        client.client = MagicMock()
-        client.client.join_game = mock_join
-        client.client.get_game_status = mock_get_status
-        client.client.submit_move = mock_submit
-        client.client.get_game_report = mock_get_report
+        # Play the game
+        result = await client.play_game("test-game-123")
         
-        # Call play_game - this is what was failing before
-        async def run_test():
-            result = await client.play_game("test-game-123")
-            return result
+        # Verify backend.choose_move was called (the test would pass vacuously without this)
+        assert mock_backend.choose_move.called, "Backend choose_move should have been called"
         
-        # This should NOT raise TypeError about unexpected keyword argument
-        try:
-            asyncio.run(run_test())
-        except TypeError as e:
-            if "strategy_revision" in str(e):
-                pytest.fail(f"play_game() still passes strategy_revision to backend: {e}")
-            raise
+        # Get the received kwargs
+        call_args = mock_backend.choose_move.call_args
+        received_kwargs = dict(call_args.kwargs) if call_args.kwargs else {}
         
-        # Verify that choose_move was called WITHOUT strategy_revision
-        assert 'strategy_revision' not in received_kwargs, \
-            "Backend choose_move() should not receive strategy_revision parameter"
+        # Verify strategy_revision is NOT in the kwargs
+        assert "strategy_revision" not in received_kwargs, \
+            "strategy_revision should NOT be passed to backend.choose_move()"
+        
+        # Verify the correct parameters WERE passed
+        assert "request_id" in received_kwargs, "request_id should be passed"
+        assert received_kwargs["request_id"] == "test-game-123", "request_id should be the game_id"
+        assert "position" in received_kwargs, "position should be passed"
+        assert "legal_moves" in received_kwargs, "legal_moves should be passed"
+        assert "clock" in received_kwargs, "clock should be passed"
+        
+        # Verify clock has the correct increment (white's increment when white to move)
+        assert "increment_ms" in received_kwargs["clock"], "increment_ms should be in clock"
+        assert received_kwargs["clock"]["increment_ms"] == 1000, \
+            "Should use white_increment (1000) when white is to move"

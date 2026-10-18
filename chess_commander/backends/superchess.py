@@ -185,9 +185,10 @@ class SuperchessBackend(ChessBackend):
             
             latency_ms = int((time.time() - start_time) * 1000)
             
-            # Get candidate moves (convert to list first for slicing)
-            candidate_moves = list(board.legal_moves)
-            candidates_uci = [m.uci() for m in candidate_moves[:10]]
+            # Get candidate moves from the RESTRICTED legal_moves set
+            # This ensures candidates_uci respects the caller's allowed moves
+            candidate_moves = [chess.Move.from_uci(m) for m in legal_moves[:10]]
+            candidates_uci = [m.uci() for m in candidate_moves]
             
             return MoveResult(
                 request_id=request_id,

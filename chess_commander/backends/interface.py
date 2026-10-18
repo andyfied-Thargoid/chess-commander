@@ -14,6 +14,7 @@ class BackendType(Enum):
     """Backend type enumeration."""
     THOMPSON = "thompson"
     ACORNSOFT = "acornsoft"
+    SPECTRUM = "spectrum"
     # Future types can be added here
 
 

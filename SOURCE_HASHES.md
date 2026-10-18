@@ -42,9 +42,31 @@ Record hashes in this file and update the table above.
 - **The Turk**: © Oxford Computer Publishing, 1983
 - **3D Chess**: © Bill Bennett, 1983
 
-These are historical programs. The Python reimplementations in `chess_commander/backends/`
-are based on reverse-engineered behavior from disassembly and are not direct copies of
-the original code.
+## Implementation Notes
+
+The Python reimplementations in `chess_commander/backends/` are **experimental approximations**
+based on classical chess evaluation techniques and reverse-engineered behavior patterns.
+
+Important clarifications:
+
+1. **Not verified reproductions**: The backends use standard piece-square tables and
+   minimax search, but have NOT been verified against the original Z80 decision logic
+   through emulator comparison.
+
+2. **3D Chess is NOT a 3D variant**: The ThreeDChessBackend is a standard chess engine
+   with a rank-control bonus. It does NOT implement the actual 3D chess variant with
+   three stacked boards and cross-board movement.
+
+3. **Source hashes pending**: SHA-256 hashes for the original Z80 images need to be
+   computed and recorded before each evaluation campaign.
+
+These backends are intended for:
+- Learning and experimentation
+- Testing the Chess Commander framework
+- Educational purposes
+
+They should NOT be used as historical recreations or for claims of matching the
+original programs' behavior without emulator-based verification.
 
 ## References
 

@@ -207,14 +207,44 @@ class TheTurkBackend(ChessBackend):
             effective_depth = min(5, self.search_depth)
         
         try:
+            board = chess.Board(position)
+            
+            # Filter legal moves to only those that are actually legal on this board
+            board_legal_moves = [m.uci() for m in board.legal_moves]
+            valid_legal_moves = [m for m in legal_moves if m in board_legal_moves]
+            
+            if not valid_legal_moves:
+                return MoveResult(
+                    request_id=request_id,
+                    status="error",
+                    move_uci=None,
+                    evidence=MoveEvidence(
+                        backend=self.backend_type,
+                        source_sha256=self.source_sha256,
+                        strategy_revision=self.strategy_revision,
+                        failure_reason="No valid legal moves provided"
+                    )
+                )
+            
             # Get best move using minimax with alpha-beta
-            best_move, best_score = self._minimax(
+            # Black is minimizing (negative scores favor Black), White is maximizing
+            is_maximizing = board.turn == chess.WHITE
+            
+            # Convert valid legal moves to chess.Move objects for search
+            valid_moves = [chess.Move.from_uci(m) for m in valid_legal_moves]
+            
+            best_move, best_score = self._minimax_with_filter(
                 board,
                 effective_depth,
                 -float('inf'),
                 float('inf'),
-                True
+                is_maximizing,
+                valid_moves
             )
+            
+            if best_move is None:
+                best_move = chess.Move.from_uci(valid_legal_moves[0])
+                best_score = 0
             
             latency_ms = int((time.time() - start_time) * 1000)
             
@@ -341,6 +371,83 @@ class TheTurkBackend(ChessBackend):
             
             return best_move, best_score
     
+
+    def _minimax_with_filter(
+        self,
+        board: chess.Board,
+        depth: int,
+        alpha: float,
+        beta: float,
+        is_maximizing: bool,
+        valid_moves: List[chess.Move]
+    ) -> Tuple[Optional[chess.Move], float]:
+        """Minimax with alpha-beta pruning, restricted to valid_moves set."""
+        if board.is_checkmate():
+            return None, -100000 + depth if is_maximizing else 100000 - depth
+        
+        if board.is_stalemate() or board.is_insufficient_material() or board.is_fifty_moves() or board.is_repetition():
+            return None, 0
+        
+        if depth == 0:
+            return None, self._evaluate_position(board)
+        
+        legal_moves = [m for m in board.legal_moves if m in valid_moves]
+        
+        if not legal_moves:
+            return None, -100000 if is_maximizing else 100000
+        
+        def move_sort_key(m):
+            score = 0
+            if board.is_capture(m):
+                score += 100
+            if board.is_check():
+                board.push(m)
+                gives_check = board.is_check()
+                board.pop()
+                if gives_check:
+                    score += 50
+            return score
+        
+        legal_moves.sort(key=move_sort_key, reverse=True)
+        
+        if is_maximizing:
+            best_score = -float('inf')
+            best_move = None
+            
+            for move in legal_moves:
+                board.push(move)
+                _, score = self._minimax_with_filter(board, depth - 1, alpha, beta, False, valid_moves)
+                board.pop()
+                
+                if score > best_score:
+                    best_score = score
+                    best_move = move
+                
+                alpha = max(alpha, score)
+                if beta <= alpha:
+                    break
+            
+            return best_move, best_score
+        
+        else:
+            best_score = float('inf')
+            best_move = None
+            
+            for move in legal_moves:
+                board.push(move)
+                _, score = self._minimax_with_filter(board, depth - 1, alpha, beta, True, valid_moves)
+                board.pop()
+                
+                if score < best_score:
+                    best_score = score
+                    best_move = move
+                
+                beta = min(beta, score)
+                if beta <= alpha:
+                    break
+            
+            return best_move, best_score
+
     def _evaluate_position(self, board: chess.Board) -> float:
         """
         Evaluate board position using The Turk's sophisticated evaluation.
@@ -456,8 +563,12 @@ class TheTurkBackend(ChessBackend):
             board.pop()
             scored_moves.append((score, move.uci()))
         
-        # Sort by score descending
-        scored_moves.sort(key=lambda x: -x[0])
+                # Rank according to player whose turn it is
+        # Black is minimizing, so sort ascending for Black, descending for White
+        if board.turn == chess.WHITE:
+            scored_moves.sort(key=lambda x: -x[0])  # Descending for White
+        else:
+            scored_moves.sort(key=lambda x: x[0])   # Ascending for Black
         
         return [move for _, move in scored_moves[:n]]
 

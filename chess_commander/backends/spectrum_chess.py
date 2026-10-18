@@ -173,7 +173,7 @@ class SpectrumChessBackend(ChessBackend):
         
         Args:
             position: FEN string of current position
-            legal_moves: List of legal UCI moves
+            legal_moves: List of legal UCI moves (must be validated against this)
             clock: Time control dict
             request_id: Unique request identifier
             
@@ -185,29 +185,62 @@ class SpectrumChessBackend(ChessBackend):
         try:
             board = chess.Board(position)
             
-            # Handle level 0 (no search, random move)
+            # Filter legal moves to only those that are actually legal on this board
+            board_legal_moves = [m.uci() for m in board.legal_moves]
+            valid_legal_moves = [m for m in legal_moves if m in board_legal_moves]
+            
+            if not valid_legal_moves:
+                # No valid moves - return error
+                return MoveResult(
+                    request_id=request_id,
+                    status="error",
+                    move_uci=None,
+                    evidence=MoveEvidence(
+                        backend=self.backend_type,
+                        source_sha256=self.source_sha256,
+                        strategy_revision=self.strategy_revision,
+                        failure_reason="No valid legal moves provided"
+                    )
+                )
+            
+            # Handle level 0 (no search, random move from valid set)
             if self.search_depth == 0:
                 import random
-                best_move = random.choice(list(board.legal_moves))
+                best_move_uci = random.choice(valid_legal_moves)
+                best_move = chess.Move.from_uci(best_move_uci)
                 best_score = 0
             else:
-                best_move, best_score = self._minimax(
+                # Black is minimizing (negative scores favor Black), White is maximizing
+                is_maximizing = board.turn == chess.WHITE
+                
+                # Convert valid legal moves to chess.Move objects for search
+                valid_moves = [chess.Move.from_uci(m) for m in valid_legal_moves]
+                
+                # Run minimax with move filtering
+                best_move, best_score = self._minimax_with_filter(
                     board,
                     self.search_depth,
                     -float('inf'),
                     float('inf'),
-                    True
+                    is_maximizing,
+                    valid_moves
                 )
+                
+                if best_move is None:
+                    # Fallback to first valid move
+                    best_move = chess.Move.from_uci(valid_legal_moves[0])
+                    best_score = 0
             
             latency_ms = int((time.time() - start_time) * 1000)
             
-            candidate_moves = list(board.legal_moves)
-            candidates_uci = [m.uci() for m in candidate_moves[:10]]
+            # Get candidate moves from valid set
+            candidate_moves = [chess.Move.from_uci(m) for m in valid_legal_moves[:10]]
+            candidates_uci = [m.uci() for m in candidate_moves]
             
             return MoveResult(
                 request_id=request_id,
                 status="ok",
-                move_uci=best_move.uci() if best_move else legal_moves[0] if legal_moves else None,
+                move_uci=best_move.uci() if best_move else valid_legal_moves[0],
                 evidence=MoveEvidence(
                     backend=self.backend_type,
                     source_sha256=self.source_sha256,
@@ -283,6 +316,86 @@ class SpectrumChessBackend(ChessBackend):
             for move in legal_moves:
                 board.push(move)
                 _, score = self._minimax(board, depth - 1, alpha, beta, True)
+                board.pop()
+                
+                if score < best_score:
+                    best_score = score
+                    best_move = move
+                
+                beta = min(beta, score)
+                if beta <= alpha:
+                    break
+            
+            return best_move, best_score
+    
+    def _minimax_with_filter(
+        self,
+        board: chess.Board,
+        depth: int,
+        alpha: float,
+        beta: float,
+        is_maximizing: bool,
+        valid_moves: List[chess.Move]
+    ) -> Tuple[Optional[chess.Move], float]:
+        """
+        Minimax with alpha-beta pruning, restricted to valid_moves set.
+        
+        Args:
+            board: Current board state
+            depth: Remaining search depth
+            alpha: Alpha value for pruning
+            beta: Beta value for pruning
+            is_maximizing: True if maximizing player's turn
+            valid_moves: List of chess.Move objects that are allowed
+            
+        Returns:
+            Tuple of (best_move, best_score)
+        """
+        if depth == 0:
+            return None, self._evaluate_position(board)
+        
+        if board.is_checkmate():
+            return None, -100000 + depth if is_maximizing else 100000 - depth
+        
+        if board.is_stalemate() or board.is_insufficient_material() or board.is_fifty_moves() or board.is_repetition():
+            return None, 0
+        
+        # Filter legal moves to only valid ones
+        legal_moves = [m for m in board.legal_moves if m in valid_moves]
+        
+        if not legal_moves:
+            # No valid moves available - return worst possible score
+            return None, -100000 if is_maximizing else 100000
+        
+        # Sort moves to improve pruning (captures first)
+        legal_moves.sort(key=lambda m: (board.is_capture(m), board.is_en_passant(m)), reverse=True)
+        
+        if is_maximizing:
+            best_score = -float('inf')
+            best_move = None
+            
+            for move in legal_moves:
+                board.push(move)
+                _, score = self._minimax_with_filter(board, depth - 1, alpha, beta, False, valid_moves)
+                board.pop()
+                
+                if score > best_score:
+                    best_score = score
+                    best_move = move
+                
+                alpha = max(alpha, score)
+                if beta <= alpha:
+                    break
+            
+            return best_move, best_score
+        
+        else:
+            best_score = float('inf')
+            best_move = None
+            
+            for move in legal_moves:
+                board.push(move)
+                _, score = self._minimax_with_filter(board, depth - 1, alpha, beta, True, valid_moves)
                 board.pop()
                 
                 if score < best_score:
@@ -372,7 +485,13 @@ class SpectrumChessBackend(ChessBackend):
             board.pop()
             scored.append((score, move.uci()))
         
-        scored.sort(key=lambda x: -x[0])
+        # Rank according to player whose turn it is
+        # Black is minimizing, so sort ascending for Black, descending for White
+        if board.turn == chess.WHITE:
+            scored.sort(key=lambda x: -x[0])  # Descending for White
+        else:
+            scored.sort(key=lambda x: x[0])   # Ascending for Black
+        
         return [m for _, m in scored[:n]]
 
 

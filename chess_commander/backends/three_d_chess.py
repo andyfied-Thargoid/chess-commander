@@ -1,19 +1,18 @@
 """
-3D Chess Backend for Chess Commander.
+3D Chess Approximation Backend for Chess Commander.
 
-Implements the computer player logic from Bill Bennett's 3D Chess (1983).
-3D Chess is a variant played on three stacked boards with pieces that can move
-between boards.
+This backend provides a standard chess implementation with a board control bonus
+that rewards controlling pieces on different ranks. It does NOT implement the
+actual 3D chess variant (three stacked boards with cross-board movement).
 
-Features identified from disassembly:
-- 3-layer board (levels 1-3)
-- Cross-board movement mechanics
-- Full chess rules extended to 3D
-- Level selection (0-9 difficulty)
-- Checkmate detection across all boards
-- Castling support (O-O, O-O-O)
+The original 3D Chess by Bill Bennett (1983) features:
+- Three stacked 8x8 boards
+- Pieces that can move between boards
+- Unique capture mechanics across boards
 
-This implementation recreates a simplified 3D chess engine in Python.
+This implementation is a standard chess engine with a rank-control bonus
+as an experimental approximation. If you want the actual 3D variant rules,
+that would require implementing a completely different board representation.
 """
 
 import time
@@ -31,21 +30,16 @@ from .interface import (
 
 class ThreeDChessBackend(ChessBackend):
     """
-    3D Chess backend - Bill Bennett's 3D Chess variant (1983).
+    3D Chess approximation - experimental standard chess with rank control bonus.
     
-    This backend implements a simplified 3D chess variant where pieces
-    can move between three stacked boards. The original game features
-    cross-board movement and unique capture mechanics.
+    This is NOT the actual 3D chess variant. It's a standard chess implementation
+    with a bonus for controlling pieces on different ranks. See module docstring
+    for details about the actual 3D chess variant by Bill Bennett.
     
     Key features:
-    - 3-layer board representation
-    - Cross-board piece movement
-    - Standard chess rules on each board
-    - Level-based difficulty (0-9)
-    
-    Args:
-        source_path: Path to original Z80 binary (for reference)
-        difficulty: Difficulty level (0-9, default=5)
+    - Standard chess rules on a single 8x8 board
+    - Level-based difficulty (0-9) mapping to search depth
+    - Board control bonus for controlling pieces on multiple ranks
     """
     
     backend_type = BackendType.SPECTRUM
@@ -180,14 +174,42 @@ class ThreeDChessBackend(ChessBackend):
         try:
             board = chess.Board(position)
             
+            # Filter legal moves to only those that are actually legal on this board
+            board_legal_moves = [m.uci() for m in board.legal_moves]
+            valid_legal_moves = [m for m in legal_moves if m in board_legal_moves]
+            
+            if not valid_legal_moves:
+                return MoveResult(
+                    request_id=request_id,
+                    status="error",
+                    move_uci=None,
+                    evidence=MoveEvidence(
+                        backend=self.backend_type,
+                        source_sha256=self.source_sha256,
+                        strategy_revision=self.strategy_revision,
+                        failure_reason="No valid legal moves provided"
+                    )
+                )
+            
             # Get best move using minimax with alpha-beta
-            best_move, best_score = self._minimax(
+            # Black is minimizing (negative scores favor Black), White is maximizing
+            is_maximizing = board.turn == chess.WHITE
+            
+            # Convert valid legal moves to chess.Move objects for search
+            valid_moves = [chess.Move.from_uci(m) for m in valid_legal_moves]
+            
+            best_move, best_score = self._minimax_with_filter(
                 board,
                 self.search_depth,
                 -float('inf'),
                 float('inf'),
-                True
+                is_maximizing,
+                valid_moves
             )
+            
+            if best_move is None:
+                best_move = chess.Move.from_uci(valid_legal_moves[0])
+                best_score = 0
             
             latency_ms = int((time.time() - start_time) * 1000)
             
@@ -299,6 +321,71 @@ class ThreeDChessBackend(ChessBackend):
             
             return best_move, best_score
     
+
+    def _minimax_with_filter(
+        self,
+        board: chess.Board,
+        depth: int,
+        alpha: float,
+        beta: float,
+        is_maximizing: bool,
+        valid_moves: List[chess.Move]
+    ) -> Tuple[Optional[chess.Move], float]:
+        """Minimax with alpha-beta pruning, restricted to valid_moves set."""
+        if board.is_checkmate():
+            return None, -100000 + depth if is_maximizing else 100000 - depth
+        
+        if board.is_stalemate() or board.is_insufficient_material() or board.is_fifty_moves() or board.is_repetition():
+            return None, 0
+        
+        if depth == 0:
+            return None, self._evaluate_position(board)
+        
+        legal_moves = [m for m in board.legal_moves if m in valid_moves]
+        
+        if not legal_moves:
+            return None, -100000 if is_maximizing else 100000
+        
+        legal_moves.sort(key=lambda m: (board.is_capture(m), board.is_en_passant(m)), reverse=True)
+        
+        if is_maximizing:
+            best_score = -float('inf')
+            best_move = None
+            
+            for move in legal_moves:
+                board.push(move)
+                _, score = self._minimax_with_filter(board, depth - 1, alpha, beta, False, valid_moves)
+                board.pop()
+                
+                if score > best_score:
+                    best_score = score
+                    best_move = move
+                
+                alpha = max(alpha, score)
+                if beta <= alpha:
+                    break
+            
+            return best_move, best_score
+        
+        else:
+            best_score = float('inf')
+            best_move = None
+            
+            for move in legal_moves:
+                board.push(move)
+                _, score = self._minimax_with_filter(board, depth - 1, alpha, beta, True, valid_moves)
+                board.pop()
+                
+                if score < best_score:
+                    best_score = score
+                    best_move = move
+                
+                beta = min(beta, score)
+                if beta <= alpha:
+                    break
+            
+            return best_move, best_score
+
     def _evaluate_position(self, board: chess.Board) -> float:
         """
         Evaluate board position using piece values and position tables.
@@ -411,8 +498,12 @@ class ThreeDChessBackend(ChessBackend):
             board.pop()
             scored_moves.append((score, move.uci()))
         
-        # Sort by score descending
-        scored_moves.sort(key=lambda x: -x[0])
+                # Rank according to player whose turn it is
+        # Black is minimizing, so sort ascending for Black, descending for White
+        if board.turn == chess.WHITE:
+            scored_moves.sort(key=lambda x: -x[0])  # Descending for White
+        else:
+            scored_moves.sort(key=lambda x: x[0])   # Ascending for Black
         
         return [move for _, move in scored_moves[:n]]
 

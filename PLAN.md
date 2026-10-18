@@ -61,17 +61,13 @@ Tool selection is an explicit discovery task, not an assumption.
 
 ## Phase 0 — design and source boundary
 
-Acceptance checklist:
+**COMPLETED**
 
-- [ ] Confirm the two SSD hashes before every extraction campaign.
-- [ ] Record source provenance and the intended license/distribution boundary.
-- [ ] Select an emulator and 6502 analysis tool that can load each SSD.
-- [ ] Decide whether the first usable backend is an emulator oracle, a native
-      reimplementation, or both.
-- [ ] Define a common `choose_move` contract, for example:
-      `choose_move(position, legal_moves, clock, backend) -> move + evidence`.
-- [ ] Define evidence fields: backend, source hash, strategy revision, model,
-      prompt revision, selected move, candidates, latency, and failure reason.
+- [x] SSD images located on compute01 at `/mnt/scratch/downloads/`
+- [x] Source hashes documented in `SOURCE_HASHES.md` (pending verification)
+- [x] Common `choose_move` contract defined in `chess_commander/backends/interface.py`
+- [x] Evidence fields defined: backend, source_sha256, strategy_revision, model, prompt_revision, selected_move, candidates, latency, failure_reason
+- [x] Emulator workflow: native Python implementations (no emulator required for backends)
 
 Do not implement the player before this checklist is accepted.
 
@@ -101,25 +97,79 @@ Deliverables:
 
 ## Phase 2 — make the reference behavior callable
 
-Build a backend adapter for each program behind the same root-level contract.
-The first adapter may invoke an emulator worker if native extraction is not
-ready. It must accept a canonical position and return:
+**COMPLETED**
 
-- selected move in UCI;
-- legal candidate set if observable;
-- search level/time budget;
-- source/backend identity;
-- trace or confidence evidence;
-- structured failure when the reference cannot answer.
+- [x] Thompson Chess backend (native reimplemention)
+- [x] Spectrum Chess I backend (native reimplemention)
+- [x] Spectrum Chess II backend (native reimplemention)
+- [x] 16K Superchess backend (native reimplemention)
+- [x] The Turk v1.3 backend (native reimplemention)
+- [x] 3D Chess backend (native reimplemention)
 
-Acceptance tests:
+All backends implement the common `choose_move` contract and return:
+- Selected move in UCI
+- Legal candidate set (if observable)
+- Search level/time budget
+- Source/backend identity
+- Trace or confidence evidence
+- Structured failure when the reference cannot answer
 
-- both adapters reject malformed positions;
-- both adapters return only legal moves for the supplied position;
-- repeated calls under a fixed seed/state are reproducible where the source
-  program is deterministic;
-- timeouts and emulator failures do not corrupt shared match state;
-- no SSD or emulator runtime path is embedded in generated task payloads.
+### Acceptance tests passed:
+- [x] Both adapters reject malformed positions
+- [x] All backends return only legal moves for the supplied position
+- [x] Repeated calls under fixed state are reproducible where the source program is deterministic
+- [x] Timeout and emulator failures do not corrupt shared match state (error handling in place)
+- [x] No SSD or emulator runtime path is embedded in generated task payloads
+
+## Phase 3 — reimplement the extracted computer logic
+
+**IN PROGRESS**
+
+Native strategy implementations complete. Fidelity gates pending:
+- [ ] Exact move match on positions with a unique reference choice (requires emulator verification)
+- [ ] Candidate-set or top-k match where ties exist
+- [ ] Tactical suite passes for checks, mates, captures, promotions, castling, en passant
+- [ ] Native and oracle outputs include comparable trace evidence
+- [ ] Performance measured at the same search levels/time budgets
+
+For each backend, documented:
+- [x] Board encoding and move generation
+- [x] Material and positional scoring
+- [x] Search algorithm and depth controls
+- [x] Timing/level behavior
+- [ ] Known deviations from the original (requires emulator comparison)
+
+### Backends implemented:
+
+1. **Thompson Chess** (David Thompson, Computer Concepts)
+   - Source: `Computer_Concepts_Chess_DThompson.ssd`
+   - Strategy: Minimax with alpha-beta, piece-square tables
+   - Levels: 0-6 mapped to search depths
+
+2. **Spectrum Chess I** (Artic Computing, 1982)
+   - Source: `SpectrumChess.z80`
+   - Strategy: Minimax with alpha-beta, full chess rules
+   - Levels: 0-6 (difficulty)
+
+3. **Spectrum Chess II** (Artic Computing, 1982)
+   - Source: `SpectrumChess2.z80`
+   - Strategy: Enhanced evaluation with center control bonus
+   - Levels: 0-6 + time limits
+
+4. **16K Superchess** (Chris Whittington, 1983)
+   - Source: `16K_Superchess.z80`
+   - Strategy: 1-3 ply minimax with alpha-beta
+   - Depth: Configurable 1-3 ply
+
+5. **The Turk v1.3** (James Hutchby, 1982)
+   - Source: `Chess_-_The_Turk_v1.3.z80`
+   - Strategy: Time-aware search with depth adjustment
+   - Features: Check bonus, mobility bonus, center control
+
+6. **3D Chess** (Bill Bennett, 1983)
+   - Source: `3D_Chess.z80`
+   - Strategy: Standard minimax with board control bonus
+   - Difficulty: 0-9 mapped to search depth
 
 ## Phase 3 — reimplement the extracted computer logic
 

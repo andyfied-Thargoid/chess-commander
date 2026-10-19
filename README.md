@@ -27,14 +27,14 @@ chess-commander/
 ├── config/                   # Configuration
 │   └── backends.yaml
 ├── references/               # Reference documentation
-│   └── chess-commander-2026-10-04.md
+│   └── pr-review-regression-tests.md
 └── tools/                    # P-code analysis tools
 ```
 
 ## Installation
 
 ```bash
-cd ~/src/workstation/chess-commander
+cd ~/src/chess-commander
 pip install -r requirements.txt
 ```
 
@@ -86,7 +86,7 @@ python3 -m pytest tests/ -v
 
 ## Documentation
 
-- [chess-commander-2026-10-04](references/chess-commander-2026-10-04.md) — Project reference
+- [PR review regression tests](references/pr-review-regression-tests.md) — Interface and test patterns
 
 ## Next Steps
 

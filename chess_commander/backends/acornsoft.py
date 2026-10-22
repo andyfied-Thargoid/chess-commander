@@ -140,6 +140,8 @@ class AcornsoftChessBackend(ChessBackend):
     def _run_search(
         self, board: chess.Board, moves: list[chess.Move], budget_ms: int
     ) -> tuple[chess.Move, list[tuple[chess.Move, float]], int, bool, int]:
+        if not moves:
+            raise ValueError("no legal moves available for search")
         state = _SearchState(
             deadline=time.monotonic() + budget_ms / 1000,
             node_budget=self.node_budget,
@@ -177,8 +179,12 @@ class AcornsoftChessBackend(ChessBackend):
         for move in self._order_moves(board, moves):
             state.visit()
             board.push(move)
-            score = self._minimax(board, depth - 1, float("-inf"), float("inf"), state)
-            board.pop()
+            try:
+                score = self._minimax(
+                    board, depth - 1, float("-inf"), float("inf"), state
+                )
+            finally:
+                board.pop()
             scores.append((move, score))
         scores.sort(key=lambda item: item[1], reverse=maximizing)
         return scores[0][0], scores
@@ -209,8 +215,12 @@ class AcornsoftChessBackend(ChessBackend):
             value = float("-inf")
             for move in moves:
                 board.push(move)
-                value = max(value, self._minimax(board, depth - 1, alpha, beta, state))
-                board.pop()
+                try:
+                    value = max(
+                        value, self._minimax(board, depth - 1, alpha, beta, state)
+                    )
+                finally:
+                    board.pop()
                 alpha = max(alpha, value)
                 if beta <= alpha:
                     break
@@ -218,8 +228,12 @@ class AcornsoftChessBackend(ChessBackend):
         value = float("inf")
         for move in moves:
             board.push(move)
-            value = min(value, self._minimax(board, depth - 1, alpha, beta, state))
-            board.pop()
+            try:
+                value = min(
+                    value, self._minimax(board, depth - 1, alpha, beta, state)
+                )
+            finally:
+                board.pop()
             beta = min(beta, value)
             if beta <= alpha:
                 break
@@ -252,6 +266,8 @@ class AcornsoftChessBackend(ChessBackend):
             return []
         board = chess.Board(position)
         moves = list(board.legal_moves)
+        if not moves:
+            return []
         _, ranked, _, _, _ = self._run_search(board, moves, self.search_time_ms)
         return [move.uci() for move, _ in ranked[:n]]
 

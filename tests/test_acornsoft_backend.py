@@ -3,6 +3,8 @@ import pytest
 
 from chess_commander.backends.acornsoft import (
     AcornsoftChessBackend,
+    _SearchState,
+    _SearchTimeout,
     create_acornsoft_backend,
 )
 from chess_commander.backends.interface import BackendType
@@ -34,6 +36,19 @@ def test_choose_move_respects_supplied_legal_moves():
     assert result.status == "ok"
     assert result.move_uci == "e2e4"
     assert result.evidence.selected_move_uci == "e2e4"
+
+
+def test_empty_legal_moves_return_structured_error():
+    result = AcornsoftChessBackend().choose_move(START, [], CLOCK, "empty-1")
+    assert result.status == "error"
+    assert result.move_uci is None
+    assert result.evidence is not None
+    assert "no legal moves" in (result.evidence.failure_reason or "").lower()
+
+
+def test_get_candidates_returns_empty_for_terminal_position():
+    checkmate = "7k/6Q1/5K2/8/8/8/8/8 b - - 1 1"
+    assert AcornsoftChessBackend().get_candidates(checkmate) == []
 
 
 def test_choose_move_finds_mate_in_one():
@@ -69,6 +84,25 @@ def test_search_deadline_returns_legal_fallback():
     assert result.status == "ok"
     assert result.move_uci in legal
     assert "timed_out=true" in result.evidence.trace_ref
+
+
+def test_timeout_restores_board_state():
+    backend = AcornsoftChessBackend(max_depth=2, node_budget=1)
+    board = chess.Board(START)
+    before = board.fen()
+    moves = list(board.legal_moves)
+    backend._run_search(board, moves, budget_ms=1000)
+    assert board.fen() == before
+
+
+def test_expired_search_state_restores_board_on_exception():
+    backend = AcornsoftChessBackend(max_depth=1)
+    board = chess.Board(START)
+    before = board.fen()
+    state = _SearchState(deadline=0, node_budget=100)
+    with pytest.raises(_SearchTimeout):
+        backend._search_root(board, list(board.legal_moves), 1, state)
+    assert board.fen() == before
 
 
 def test_evidence_contains_ranked_search_candidates_and_scores():

@@ -91,7 +91,7 @@ python3 -m pytest tests/ -v
 
 ## Next Steps
 
-- [x] Acornsoft backend (native adapter; emulator remains the fidelity oracle)
+- [x] Acornsoft backend (bounded native approximation; emulator remains the fidelity oracle)
 - [ ] Deploy Punchess server
 - [ ] Run live games
 - [ ] Enhanced evaluation (mobility, center control)

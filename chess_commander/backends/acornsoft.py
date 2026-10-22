@@ -1,14 +1,15 @@
 """Acornsoft Chess V2.1 backend.
 
-Native strategy adapter for the BBC Micro Acornsoft Chess reference program.
-The emulator remains the behavioural oracle; this module provides the common
-Chess Commander contract without embedding the copyrighted SSD image.
+This is a bounded native approximation of the BBC Micro program. The original
+SSD remains an external behavioural oracle: ``source_path`` is provenance
+metadata only and is deliberately not opened by this adapter.
 """
 
 from __future__ import annotations
 
 import time
 from collections.abc import Iterable
+from dataclasses import dataclass
 from typing import ClassVar
 
 import chess
@@ -16,18 +17,35 @@ import chess
 from .interface import BackendType, ChessBackend, MoveEvidence, MoveResult
 
 
-class AcornsoftChessBackend(ChessBackend):
-    """A bounded native approximation of Acornsoft Chess V2.1.
+class _SearchTimeout(Exception):
+    """Internal signal used to stop an incomplete iterative-deepening pass."""
 
-    Acornsoft exposes ten skill levels.  Levels 0 and 1 are shallow play;
+
+@dataclass
+class _SearchState:
+    deadline: float
+    node_budget: int
+    nodes: int = 0
+
+    def visit(self) -> None:
+        self.nodes += 1
+        if self.nodes > self.node_budget or time.monotonic() >= self.deadline:
+            raise _SearchTimeout
+
+
+class AcornsoftChessBackend(ChessBackend):
+    """Bounded native approximation of Acornsoft Chess V2.1.
+
+    Acornsoft exposes ten skill levels. Levels 0 and 1 are shallow play;
     levels 2-5 are documented whole-move searches, while levels 6-9 are
-    progressively harder settings.  ``max_depth`` is an explicit safety cap
-    for service use and can be raised for offline qualification.
+    progressively harder settings. Exact historical move fidelity is not
+    claimed until emulator comparison is complete.
     """
 
     backend_type = BackendType.ACORNSOFT
     SOURCE_SHA256 = "72d14af1fced97aca88e6532fac54b213b7b81b819a5a8a435be39837afb037b"
     SOURCE_FILE = "Acornsoft_Chess_V2.1.ssd"
+    MAX_SEARCH_DEPTH = 9
 
     PIECE_VALUES: ClassVar[dict[int, int]] = {
         chess.PAWN: 100,
@@ -44,16 +62,24 @@ class AcornsoftChessBackend(ChessBackend):
         source_path: str | None = None,
         skill_level: int = 2,
         max_depth: int | None = None,
-        strategy_revision: str = "acornsoft-v1",
+        search_time_ms: int = 1_000,
+        node_budget: int = 100_000,
+        strategy_revision: str = "acornsoft-approx-v2",
     ) -> None:
         super().__init__(self.SOURCE_SHA256, strategy_revision, source_path)
         if not 0 <= skill_level <= 9:
             raise ValueError("skill_level must be between 0 and 9")
+        if max_depth is not None and not 1 <= max_depth <= self.MAX_SEARCH_DEPTH:
+            raise ValueError(f"max_depth must be between 1 and {self.MAX_SEARCH_DEPTH}")
+        if search_time_ms <= 0:
+            raise ValueError("search_time_ms must be positive")
+        if node_budget <= 0:
+            raise ValueError("node_budget must be positive")
         self.skill_level = skill_level
-        documented_depth = 1 if skill_level <= 1 else min(skill_level, 5)
-        self.search_depth = max(
-            1, max_depth if max_depth is not None else documented_depth
-        )
+        documented_depth = max(1, skill_level)
+        self.search_depth = max_depth if max_depth is not None else documented_depth
+        self.search_time_ms = search_time_ms
+        self.node_budget = node_budget
 
     def choose_move(
         self,
@@ -68,10 +94,16 @@ class AcornsoftChessBackend(ChessBackend):
             allowed = self._allowed_moves(board, legal_moves)
             if not allowed:
                 raise ValueError("no legal moves supplied for the position")
-            best_move, _ = self._search_root(board, allowed, self.search_depth)
-            if best_move is None:
-                raise ValueError("search produced no move")
+            budget_ms = self._effective_budget_ms(board, clock)
+            best_move, ranked, completed_depth, timed_out, nodes = self._run_search(
+                board, allowed, budget_ms
+            )
             selected = best_move.uci()
+            scores = {move.uci(): score for move, score in ranked[:10]}
+            trace = (
+                f"depth={completed_depth};nodes={nodes};budget_ms={budget_ms};"
+                f"timed_out={str(timed_out).lower()}"
+            )
             return MoveResult(
                 request_id=request_id,
                 status="ok",
@@ -81,8 +113,10 @@ class AcornsoftChessBackend(ChessBackend):
                     source_sha256=self.source_sha256,
                     strategy_revision=self.strategy_revision,
                     selected_move_uci=selected,
-                    candidates_uci=[move.uci() for move in allowed[:10]],
+                    candidates_uci=[move.uci() for move, _ in ranked[:10]],
+                    candidate_scores=scores,
                     latency_ms=int((time.monotonic() - started) * 1000),
+                    trace_ref=trace,
                 ),
             )
         except ValueError as exc:
@@ -97,6 +131,33 @@ class AcornsoftChessBackend(ChessBackend):
                 ),
             )
 
+    def _effective_budget_ms(self, board: chess.Board, clock: dict) -> int:
+        remaining = clock.get("white_ms" if board.turn == chess.WHITE else "black_ms")
+        if isinstance(remaining, (int, float)) and remaining > 0:
+            return min(self.search_time_ms, max(1, int(remaining // 20)))
+        return self.search_time_ms
+
+    def _run_search(
+        self, board: chess.Board, moves: list[chess.Move], budget_ms: int
+    ) -> tuple[chess.Move, list[tuple[chess.Move, float]], int, bool, int]:
+        state = _SearchState(
+            deadline=time.monotonic() + budget_ms / 1000,
+            node_budget=self.node_budget,
+        )
+        best_move = self._order_moves(board, moves)[0]
+        ranked = [(best_move, 0.0)]
+        completed_depth = 0
+        timed_out = False
+        for depth in range(1, self.search_depth + 1):
+            try:
+                candidate, scores = self._search_root(board, moves, depth, state)
+            except _SearchTimeout:
+                timed_out = True
+                break
+            best_move, ranked = candidate, scores
+            completed_depth = depth
+        return best_move, ranked, completed_depth, timed_out, state.nodes
+
     @staticmethod
     def _allowed_moves(
         board: chess.Board, legal_moves: Iterable[str]
@@ -105,25 +166,32 @@ class AcornsoftChessBackend(ChessBackend):
         return [legal[uci] for uci in legal_moves if uci in legal]
 
     def _search_root(
-        self, board: chess.Board, moves: list[chess.Move], depth: int
-    ) -> tuple[chess.Move | None, float]:
+        self,
+        board: chess.Board,
+        moves: list[chess.Move],
+        depth: int,
+        state: _SearchState,
+    ) -> tuple[chess.Move, list[tuple[chess.Move, float]]]:
         maximizing = board.turn == chess.WHITE
-        best_move: chess.Move | None = None
-        best_score = float("-inf") if maximizing else float("inf")
-        ordered = self._order_moves(board, moves)
-        for move in ordered:
+        scores: list[tuple[chess.Move, float]] = []
+        for move in self._order_moves(board, moves):
+            state.visit()
             board.push(move)
-            score = self._minimax(board, depth - 1, float("-inf"), float("inf"))
+            score = self._minimax(board, depth - 1, float("-inf"), float("inf"), state)
             board.pop()
-            if (maximizing and score > best_score) or (
-                not maximizing and score < best_score
-            ):
-                best_move, best_score = move, score
-        return best_move, best_score
+            scores.append((move, score))
+        scores.sort(key=lambda item: item[1], reverse=maximizing)
+        return scores[0][0], scores
 
     def _minimax(
-        self, board: chess.Board, depth: int, alpha: float, beta: float
+        self,
+        board: chess.Board,
+        depth: int,
+        alpha: float,
+        beta: float,
+        state: _SearchState,
     ) -> float:
+        state.visit()
         if board.is_checkmate():
             return -100_000.0 if board.turn == chess.WHITE else 100_000.0
         if (
@@ -141,7 +209,7 @@ class AcornsoftChessBackend(ChessBackend):
             value = float("-inf")
             for move in moves:
                 board.push(move)
-                value = max(value, self._minimax(board, depth - 1, alpha, beta))
+                value = max(value, self._minimax(board, depth - 1, alpha, beta, state))
                 board.pop()
                 alpha = max(alpha, value)
                 if beta <= alpha:
@@ -150,7 +218,7 @@ class AcornsoftChessBackend(ChessBackend):
         value = float("inf")
         for move in moves:
             board.push(move)
-            value = min(value, self._minimax(board, depth - 1, alpha, beta))
+            value = min(value, self._minimax(board, depth - 1, alpha, beta, state))
             board.pop()
             beta = min(beta, value)
             if beta <= alpha:
@@ -180,22 +248,28 @@ class AcornsoftChessBackend(ChessBackend):
         return score + mobility if board.turn == chess.WHITE else score - mobility
 
     def get_candidates(self, position: str, n: int = 3) -> list[str]:
+        if n <= 0:
+            return []
         board = chess.Board(position)
         moves = list(board.legal_moves)
-        scored = []
-        for move in moves:
-            board.push(move)
-            scored.append((self._evaluate(board), move.uci()))
-            board.pop()
-        scored.sort(reverse=board.turn == chess.WHITE)
-        return [move for _, move in scored[:n]]
+        _, ranked, _, _, _ = self._run_search(board, moves, self.search_time_ms)
+        return [move.uci() for move, _ in ranked[:n]]
 
 
 def create_acornsoft_backend(
     source_path: str | None = None,
     skill_level: int = 2,
     max_depth: int | None = None,
-    strategy_revision: str = "acornsoft-v1",
+    search_time_ms: int = 1_000,
+    node_budget: int = 100_000,
+    strategy_revision: str = "acornsoft-approx-v2",
 ) -> AcornsoftChessBackend:
-    """Create an Acornsoft Chess backend."""
-    return AcornsoftChessBackend(source_path, skill_level, max_depth, strategy_revision)
+    """Create a bounded Acornsoft Chess approximation backend."""
+    return AcornsoftChessBackend(
+        source_path,
+        skill_level,
+        max_depth,
+        search_time_ms,
+        node_budget,
+        strategy_revision,
+    )

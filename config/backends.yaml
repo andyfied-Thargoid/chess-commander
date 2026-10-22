@@ -1,4 +1,8 @@
 backends:
+  acornsoft:
+    enabled: true
+    source_path: /mnt/scratch/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd
+    strategy_revision: acornsoft-v1
   thompson:
     enabled: true
     source_path: /mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd

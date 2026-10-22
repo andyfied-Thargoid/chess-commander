@@ -20,6 +20,7 @@ chess-commander/
 │   ├── server.py             # Entry point
 │   └── backends/
 │       ├── interface.py      # Abstract base class
+│       ├── acornsoft.py      # Acornsoft Chess V2.1
 │       ├── thompson.py       # Thompson Chess 2.32/1
 │       └── punchess_client.py # Punchess integration
 ├── tests/                    # Unit tests
@@ -90,7 +91,7 @@ python3 -m pytest tests/ -v
 
 ## Next Steps
 
-- [ ] Acornsoft backend (requires emulator trace)
+- [x] Acornsoft backend (native adapter; emulator remains the fidelity oracle)
 - [ ] Deploy Punchess server
 - [ ] Run live games
 - [ ] Enhanced evaluation (mobility, center control)

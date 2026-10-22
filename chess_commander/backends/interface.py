@@ -27,6 +27,7 @@ class MoveEvidence:
     model: Optional[str] = None
     prompt_revision: Optional[str] = None
     candidates_uci: Optional[List[str]] = None
+    candidate_scores: Optional[dict[str, float]] = None
     selected_move_uci: Optional[str] = None
     latency_ms: Optional[int] = None
     seed: Optional[int] = None

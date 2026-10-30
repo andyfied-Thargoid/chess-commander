@@ -89,12 +89,13 @@ python3 -m pytest tests/ -v
 
 - [PR review regression tests](references/pr-review-regression-tests.md) — Interface and test patterns
 
-## Next Steps
+## Current Status and Next Steps
 
-- [x] Acornsoft backend (bounded native approximation; emulator remains the fidelity oracle)
-- [ ] Deploy Punchess server
-- [ ] Run live games
-- [ ] Enhanced evaluation (mobility, center control)
+- [x] Native backends implemented for Acornsoft, Thompson, Spectrum Chess I/II, 16K Superchess, The Turk, and 3D Chess
+- [ ] Verify the remaining source hashes and complete emulator/oracle fidelity comparisons
+- [ ] Implement the shared P40 player client for the Acornsoft and Thompson profiles
+- [ ] Integrate the profiles with Punchess while preserving Punchess as the referee
+- [ ] Deploy Punchess and run bounded qualification matches/live games
 
 ## License
 

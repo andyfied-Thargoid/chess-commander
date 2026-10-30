@@ -2,14 +2,16 @@
 
 ## Decision
 
-Build two selectable chess-player backends from the supplied BBC Micro
-programs, then expose both through a common P40 player client for Punchess.
-Punchess remains the referee and match authority.
+Build selectable chess-player backends from the supplied historical chess programs, then expose the selected strategies through a common P40 player client for Punchess. Punchess remains the referee and match authority.
 
-The two backends are:
+Native backends currently implemented are:
 
-- `acornsoft/`: Acornsoft Chess V2.1.
+- `acornsoft/`: Acornsoft Chess V2.1 (bounded native approximation; fidelity oracle still required).
 - `thompson/`: D. Thompson / Computer Concepts Chess 2.32/1.
+- `spectrum_chess.py`: Spectrum Chess I and II.
+- `superchess.py`: 16K Superchess.
+- `the_turk.py`: The Turk v1.3.
+- `three_d_chess.py`: 3D Chess.
 
 Shared contracts, P40 prompting, move submission, provenance, and test
 fixtures stay at the repository root. Backend-specific analysis and adapters
@@ -64,7 +66,7 @@ Tool selection is an explicit discovery task, not an assumption.
 **COMPLETED**
 
 - [x] SSD images located on compute01 at `/mnt/scratch/downloads/`
-- [x] Source hashes documented in `SOURCE_HASHES.md` (pending verification)
+- [x] Source hashes are recorded in `SOURCE_HASHES.md`; verification of the ZX Spectrum source set remains open.
 - [x] Common `choose_move` contract defined in `chess_commander/backends/interface.py`
 - [x] Evidence fields defined: backend, source_sha256, strategy_revision, model, prompt_revision, selected_move, candidates, latency, failure_reason
 - [x] Emulator workflow: native Python implementations (no emulator required for backends)
@@ -104,7 +106,8 @@ Deliverables:
 - [x] Spectrum Chess II backend (native reimplemention)
 - [x] 16K Superchess backend (native reimplemention)
 - [x] The Turk v1.3 backend (native reimplemention)
-- [x] 3D Chess backend (native reimplemention)
+- [x] 3D Chess backend (native reimplementation)
+- [x] Acornsoft Chess backend (bounded native approximation)
 
 All backends implement the common `choose_move` contract and return:
 - Selected move in UCI
@@ -275,9 +278,8 @@ For every match retain:
 - The first implementation is accepted before adding durable Hatchet
   orchestration; Hatchet is not part of the initial chess player path.
 
-## Immediate next chunk
+## Current next chunk
 
-Complete Phase 0 only: select the emulator/disassembler workflow, confirm both
-source images, define the common move/evidence contract, and produce the first
-Acornsoft and Thompson position corpus. Do not modify Punchess or implement a
-P40 client until that design checkpoint is reviewed.
+Complete the Phase 3 fidelity gates using an emulator or other verified reference oracle: validate unique and tied reference moves, run the tactical suite, compare trace evidence, measure performance, and document known deviations. Do not claim historical strategy fidelity from native-backend legality tests alone.
+
+After the fidelity checkpoint, implement the shared Phase 4 P40 client, then make the smallest Phase 5 Punchess integration and run the Phase 6 qualification matches.

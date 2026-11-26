@@ -69,7 +69,9 @@ Tool selection is an explicit discovery task, not an assumption.
 - [x] Source hashes are recorded in `SOURCE_HASHES.md`; verification of the ZX Spectrum source set remains open.
 - [x] Common `choose_move` contract defined in `chess_commander/backends/interface.py`
 - [x] Evidence fields defined: backend, source_sha256, strategy_revision, model, prompt_revision, selected_move, candidates, latency, failure_reason
-- [x] Emulator workflow: native Python implementations (no emulator required for backends)
+- [x] Emulator workflow: native Python implementations for the backends; a reference
+      emulator oracle (Spectrum/BBC) is required *only* for the Phase 3 fidelity
+      gates — see Phase 3 and "Current next chunk"
 
 Do not implement the player before this checklist is accepted.
 
@@ -128,7 +130,14 @@ All backends implement the common `choose_move` contract and return:
 
 **IN PROGRESS**
 
-Native strategy implementations complete. Fidelity gates pending:
+Native strategy implementations complete and verified (all 6 backends produce
+legal moves on the start position). **Emulator oracle toolchain is built and
+verified:** FUSE 1.10.1 (ZX Spectrum, headless via Xvfb) and b2 (BBC Micro,
+headless via Xvfb) both boot the real sources; all 5 Spectrum sources are
+re-pulled and hashed (`SOURCE_HASHES.md`). Fidelity gates pending — the
+remaining work is the **reference-oracle driver**: (a) a screen-capture / RZX
+frame-decode front-end so the emulated screen can be read, (b) per-program
+position-input / move-output protocol discovery for all 7 programs, then (c):
 - [ ] Exact move match on positions with a unique reference choice (requires emulator verification)
 - [ ] Candidate-set or top-k match where ties exist
 - [ ] Tactical suite passes for checks, mates, captures, promotions, castling, en passant

@@ -4,6 +4,12 @@
 **Project**: Chess Commander (`~/src/chess-commander`)  
 **Source**: Chris Whittington's 16K Superchess (1983) Z80 binary
 
+> **Source-file status (2026-11-26):** The z80 source, disassembly, and
+> `z80disasm.py` listed below were volatile `/tmp` working files, cleared on
+> reboot. **Re-pull before the Phase 3 fidelity comparison.** The durable BBC
+> Micro SSDs (Acornsoft, Thompson) are at
+> `/mnt/marmot/project-data/chess-commander/` (see `SOURCE_HASHES.md`).
+
 ## Objective
 
 Port the computer player logic from 16K Superchess (1983) into a Python backend for Chess Commander, enabling vintage chess AI to play on modern platforms.

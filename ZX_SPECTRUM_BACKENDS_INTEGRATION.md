@@ -1,5 +1,10 @@
 # ZX Spectrum Chess Backends - Complete Integration
 
+> **Source-file status (2026-11-26):** The z80 sources below were volatile `/tmp`
+> working files, cleared on reboot. **Re-pull before the Phase 3 fidelity
+> comparison.** Durable sources: the two BBC Micro SSDs at
+> `/mnt/marmot/project-data/chess-commander/` (see `SOURCE_HASHES.md`).
+
 ## Overview
 
 Successfully integrated **three classic ZX Spectrum chess engines** into the Chess Commander project:

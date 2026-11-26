@@ -53,7 +53,7 @@ python3 -m chess_commander.server
 from chess_commander.backends.thompson import ThompsonChessBackend
 
 backend = ThompsonChessBackend(
-    source_path='/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
+    source_path='/mnt/marmot/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd',
     strategy_revision='oracle-v0'
 )
 

@@ -1,5 +1,10 @@
 # ZX Spectrum Chess Games - Metadata Reference
 
+> **Source-file status (2026-11-26):** The z80 sources listed below were working
+> files in volatile `/tmp` and were cleared on reboot. **Re-pull them before any
+> Phase 3 fidelity comparison.** The two BBC Micro SSDs (Acornsoft, Thompson)
+> are the durable sources at `/mnt/marmot/project-data/chess-commander/`.
+
 ## Complete Game List (5 Games)
 
 All backends are production-ready and tested!

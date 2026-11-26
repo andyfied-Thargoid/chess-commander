@@ -29,9 +29,9 @@ stay in their respective directories.
 
 Reference inputs on compute01:
 
-- `/mnt/scratch/downloads/Acornsoft_Chess_V2.1.ssd`
+- `/mnt/marmot/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd`
   - SHA-256: `72d14af1fced97aca88e6532fac54b213b7b81b819a5a8a435be39837afb037b`
-- `/mnt/scratch/downloads/Computer_Concepts_Chess_DThompson.ssd`
+- `/mnt/marmot/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd`
   - SHA-256: `80120f0f346194a388ebb7152d9970ec635612fee38b733d7002f113b941eb95`
 
 ## Current integration facts
@@ -63,7 +63,7 @@ Tool selection is an explicit discovery task, not an assumption.
 
 **COMPLETED**
 
-- [x] SSD images located on compute01 at `/mnt/scratch/downloads/`
+- [x] SSD images located on compute01 at `/mnt/marmot/project-data/chess-commander/`
 - [x] Source hashes documented in `SOURCE_HASHES.md` (pending verification)
 - [x] Common `choose_move` contract defined in `chess_commander/backends/interface.py`
 - [x] Evidence fields defined: backend, source_sha256, strategy_revision, model, prompt_revision, selected_move, candidates, latency, failure_reason

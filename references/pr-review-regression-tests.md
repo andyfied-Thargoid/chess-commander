@@ -167,7 +167,7 @@ import pytest
 
 SSD_PATH = os.environ.get(
     'THOMPSON_SSD_PATH',
-    '/mnt/scratch/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd'
+    '/mnt/marmot/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd'
 )
 
 @pytest.fixture

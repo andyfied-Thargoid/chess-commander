@@ -116,8 +116,8 @@ print(f"Selected: {result.move_uci}")
 ## References
 
 - Original: `Chess_-_The_Turk_v1.3_(1983)(Oxford_Computer_Publishing).z80`
-- Location: `/mnt/scratch/downloads/` on compute01
-- SHA-256: TODO (verify before evaluation)
+- Location: intended `/mnt/marmot/project-data/chess-commander/` on compute01 — **not yet re-pulled** (was a volatile `/tmp` working file, cleared on reboot)
+- SHA-256: TODO (re-pull and verify before evaluation)
 
 ## Comparison with Other Backends
 

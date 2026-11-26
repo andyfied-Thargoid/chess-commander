@@ -12,8 +12,8 @@ has been made.
    a command-line disk image, supports BBC B models with the 8271 controller,
    and exposes a debugger through the terminal. Start with BBC B model 3:
 
-       b-em /mnt/scratch/downloads/Acornsoft_Chess_V2.1.ssd -m3
-       b-em /mnt/scratch/downloads/Computer_Concepts_Chess_DThompson.ssd -m3
+       b-em /mnt/marmot/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd -m3
+       b-em /mnt/marmot/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd -m3
 
    These commands are procedure examples only; B-Em is not installed on this
    host yet. Emulator runs must use disposable config, CMOS, and save-state
@@ -37,15 +37,15 @@ References:
 ## Source boundary
 
 `SOURCE_MANIFEST.json` records the two verified local SSDs. The images remain
-under `/mnt/scratch/downloads` and are excluded from Git. The source programs'
+under `/mnt/marmot/project-data/chess-commander/` and are excluded from Git. The source programs'
 redistribution status is not established, so the repository may contain
 annotations, hashes, and original-authored clean-room reimplementations, but
 not copied disk images or extracted binary payloads until licensing is resolved.
 
 Before each extraction campaign:
 
-    sha256sum /mnt/scratch/downloads/Acornsoft_Chess_V2.1.ssd
-    sha256sum /mnt/scratch/downloads/Computer_Concepts_Chess_DThompson.ssd
+    sha256sum /mnt/marmot/project-data/chess-commander/Acornsoft_Chess_V2.1.ssd
+    sha256sum /mnt/marmot/project-data/chess-commander/Computer_Concepts_Chess_DThompson.ssd
 
 The output must match `SOURCE_MANIFEST.json`.
 

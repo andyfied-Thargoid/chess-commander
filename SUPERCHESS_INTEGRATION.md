@@ -1,5 +1,10 @@
 # 16K Superchess Backend Integration
 
+> **Source-file status (2026-11-26):** The z80 source and disassembly below were
+> volatile `/tmp` working files, cleared on reboot. **Re-pull before the Phase 3
+> fidelity comparison.** The durable BBC Micro SSDs (Acornsoft, Thompson) are at
+> `/mnt/marmot/project-data/chess-commander/` (see `SOURCE_HASHES.md`).
+
 ## Summary
 
 Successfully extracted and integrated the computer player logic from Chris Whittington's **16K Superchess (1983)** into the Chess Commander project.

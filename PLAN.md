@@ -128,6 +128,11 @@ All backends implement the common `choose_move` contract and return:
 
 ## Phase 3 — reimplement the extracted computer logic
 
+Create native strategy implementations from the annotated behavior. Do not
+copy unrelated UI, loader, or copyrighted binary data into the repository.
+Preserve a reference-oracle mode so the native implementation can be compared
+against the original.
+
 **IN PROGRESS**
 
 Native strategy implementations complete and verified (all 6 backends produce
@@ -149,7 +154,9 @@ For each backend, documented:
 - [x] Board encoding and move generation
 - [x] Material and positional scoring
 - [x] Search algorithm and depth controls
+- [x] Pruning or move ordering
 - [x] Timing/level behavior
+- [x] Tie-breaking and any observed randomness
 - [ ] Known deviations from the original (requires emulator comparison)
 
 ### Backends implemented:
@@ -183,32 +190,6 @@ For each backend, documented:
    - Source: `3D_Chess.z80`
    - Strategy: Standard minimax with board control bonus
    - Difficulty: 0-9 mapped to search depth
-
-## Phase 3 — reimplement the extracted computer logic
-
-Create native strategy implementations from the annotated behavior. Do not
-copy unrelated UI, loader, or copyrighted binary data into the repository.
-Preserve a reference-oracle mode so the native implementation can be compared
-against the original.
-
-For each backend, document:
-
-- board encoding and move generation;
-- material and positional scoring;
-- search algorithm and depth controls;
-- pruning or move ordering;
-- timing/level behavior;
-- tie-breaking and any observed randomness;
-- known deviations from the original.
-
-Fidelity gates:
-
-- exact move match on positions with a unique reference choice;
-- candidate-set or top-k match where ties exist;
-- tactical suite passes for checks, mates, captures, promotions, castling,
-  en passant, and forced defensive moves;
-- native and oracle outputs include comparable trace evidence;
-- performance is measured at the same search levels/time budgets.
 
 ## Phase 4 — P40 player client
 

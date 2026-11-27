@@ -16,16 +16,12 @@
     └── The_Turk.tzx
 ```
 
-**Not present (must be re-pulled before Phase 3 fidelity gates):**
-
-The 5 ZX Spectrum sources were working files in volatile `/tmp`
-(cleared on reboot). **Re-pulled 2026-11-26** from World of Spectrum and
-extracted to `/mnt/marmot/project-data/chess-commander/sources/` (see
-"Source Image Locations" below). The canonical archive.org / World of
-Spectrum distributions are tape/snapshot images (`.tap` / `.tzx` / `.z80`),
-not the disassembled `.z80` binaries referenced in the table below — the
-`.z80` disassemblies must be regenerated from these images before
-`z80disasm.py` can run for the fidelity comparison.
+**Re-pulled 2026-11-26** from World of Spectrum and extracted to
+`/mnt/marmot/project-data/chess-commander/sources/` (listed above). The
+canonical archive.org / World of Spectrum distributions are tape/snapshot
+images (`.tap` / `.tzx` / `.z80`), not the disassembled `.z80` binaries the
+original table referenced — the `.z80` disassemblies must be regenerated from
+these images before `z80disasm.py` can run for the fidelity comparison.
 
 ## Source Hashes
 
@@ -52,13 +48,14 @@ cd /mnt/marmot/project-data/chess-commander/
 sha256sum Acornsoft_Chess_V2.1.ssd Computer_Concepts_Chess_DThompson.ssd
 ```
 
-For the Spectrum z80 sources, re-pull first, then:
+For the Spectrum sources (already re-pulled to `sources/`), verify directly:
 
 ```bash
-sha256sum SpectrumChess.z80 SpectrumChess2.z80 \
-    16K_Superchess_(1983)(CP)(16K).z80 \
-    Chess_-_The_Turk_v1.3_(1983)(Oxford_Computer_Publishing).z80 \
-    3D_Chess_(1983)(Bennett,_Bill).z80
+cd /mnt/marmot/project-data/chess-commander/
+sha256sum sources/SpectrumChess_I.tzx sources/SpectrumChess_II.tzx \
+    sources/16K_Superchess.tap \
+    sources/The_Turk.tzx \
+    sources/3D_Chess.z80
 ```
 
 Record hashes in this file and update the table above.

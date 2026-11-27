@@ -51,12 +51,22 @@ def _free_display(start: int = DEFAULT_DISPLAY_BASE, tries: int = 20) -> str:
 
     A stale lock from a crashed session otherwise makes the next Xvfb die with
     "Server is already active for display N" — the root cause of flaky runs.
+    Raises EmuError if none of the candidate displays is free, rather than
+    fabricating a number that is presumably also busy.
     """
     for n in range(start, start + tries):
-        if not (os.path.exists(f"/tmp/.X{n+1}-lock")
-                or os.path.exists(f"/tmp/.X11-unix/X{n+1}")):
-            return f":{n+1}"
-    return f":{start + tries}"
+        d = n + 1
+        try:
+            busy = (os.path.exists(f"/tmp/.X{d}-lock")
+                    or os.path.exists(f"/tmp/.X11-unix/X{d}"))
+        except OSError:
+            continue  # /tmp/.X11-unix unreadable: skip this candidate
+        if not busy:
+            return f":{d}"
+    raise EmuError(
+        f"no free Xvfb display in :{start}..:{start + tries - 1} "
+        "(all locks/sockets in use)"
+    )
 
 
 def _clear_display_lock(display: Optional[str]) -> None:
@@ -101,8 +111,10 @@ class EmuSession:
     _xvfb: Optional[subprocess.Popen] = field(default=None, repr=False)
     _emu: Optional[subprocess.Popen] = field(default=None, repr=False)
     _env: dict = field(default_factory=dict, repr=False)
+    _started: bool = field(default=False, repr=False)
     _log_xvfb: str = "/tmp/emu-xvfb.log"
     _log_emu: str = "/tmp/emu-fuse.log"
+    _log_files: List = field(default_factory=list, repr=False)
 
     # ---- lifecycle -------------------------------------------------------
 
@@ -135,10 +147,11 @@ class EmuSession:
         _clear_display_lock(self.display)  # drop a stale lock for this display
         try:
             # Xvfb
+            self._log_files.append(open(self._log_xvfb, "w"))
             self._xvfb = subprocess.Popen(
                 ["Xvfb", self.display, "-screen", "0", self.screen,
                  "-ac", "-nolisten", "tcp"],
-                stdout=open(self._log_xvfb, "w"), stderr=subprocess.STDOUT,
+                stdout=self._log_files[-1], stderr=subprocess.STDOUT,
             )
             time.sleep(1.0)
             if self._xvfb.poll() is not None:
@@ -151,9 +164,10 @@ class EmuSession:
 
             # Emulator
             cmd = [self.emulator, *self.emulator_args, self.source]
+            self._log_files.append(open(self._log_emu, "w"))
             self._emu = subprocess.Popen(
                 cmd, env=self._env,
-                stdout=open(self._log_emu, "w"), stderr=subprocess.STDOUT,
+                stdout=self._log_files[-1], stderr=subprocess.STDOUT,
             )
             time.sleep(boot_wait)
             if self._emu.poll() is not None:
@@ -161,16 +175,19 @@ class EmuSession:
                     f"emulator exited at startup (rc={self._emu.returncode}); "
                     "see " + self._log_emu
                 )
+            self._started = True
         except EmuError:
             self.stop()
-            _clear_display_lock(self.display)
             raise
         return self
 
     def stop(self) -> None:
         """Terminate the emulator then Xvfb. Safe to call multiple times.
 
-        Also clears the display lock so the next session can reuse the number.
+        Re-waits after SIGKILL so the child is reaped (no zombie) and the
+        X socket is actually gone before the display lock is cleared. Only
+        clears the display lock if the session actually started, so a
+        never-started session's stop() cannot delete an unrelated lock.
         """
         for proc in (self._emu, self._xvfb):
             if proc is not None and proc.poll() is None:
@@ -179,9 +196,21 @@ class EmuSession:
                     proc.wait(timeout=5)
                 except subprocess.TimeoutExpired:
                     proc.kill()
+                    try:
+                        proc.wait(timeout=5)  # reap the killed child
+                    except subprocess.TimeoutExpired:
+                        pass
         self._emu = None
         self._xvfb = None
-        _clear_display_lock(self.display)
+        for fh in self._log_files:
+            try:
+                fh.close()
+            except OSError:
+                pass
+        self._log_files.clear()
+        if self._started:
+            _clear_display_lock(self.display)
+            self._started = False
 
     def __enter__(self) -> "EmuSession":
         return self.start()

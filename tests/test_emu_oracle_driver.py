@@ -82,6 +82,31 @@ def test_capture_requires_running():
         s.capture()
 
 
+def test_stop_never_started_does_not_clear_lock(tmp_path):
+    """stop() on a never-started session must not delete a display lock that
+    belongs to someone else (the display was only provisionally picked in
+    __post_init__)."""
+    # Use a display that is NOT in the free range, so _free_display won't
+    # naturally pick it and no other session owns it.
+    s = EmuSession(FUSE, SPECTRUM_I, display=":97")
+    lock = "/tmp/.X97-lock"
+    # Create a sentinel lock file (stand-in for a real X lock).
+    Path(lock).write_text("sentinel")
+    try:
+        s.stop()  # must NOT clear it, since the session never started
+        assert Path(lock).exists(), "stop() cleared an unrelated display lock"
+    finally:
+        Path(lock).unlink(missing_ok=True)
+
+
+def test_free_display_raises_when_none_free(monkeypatch):
+    """_free_display must raise EmuError (not fabricate a number) when every
+    candidate display is busy."""
+    monkeypatch.setattr(mod.os.path, "exists", lambda p: True)
+    with pytest.raises(EmuError, match="no free Xvfb display"):
+        mod._free_display(start=97, tries=20)
+
+
 # ---- end-to-end capture (skip when tools/files absent) -------------------
 
 def _tools_present() -> bool:
@@ -144,13 +169,20 @@ def test_keyboard_input_reaches_emu(tmp_path):
                    ld_library_path=LSP)
     s.start(boot_wait=8.0)
     try:
+        # Retry the key sweep up to 3 rounds: under Xvfb the tape can load
+        # slowly, so the first round's keys may land before the program is
+        # interactive. Each round re-captures a fresh baseline. A successful
+        # round (any key changes >=20px) breaks out early.
         best = 0
-        for key in ("w", "W", "Return", "space", "S"):
-            before = s.capture()
-            s.key(key)
-            s.wait(1.0)
-            after = s.capture()
-            best = max(best, delta_px(before, after))
+        for _round in range(3):
+            for key in ("w", "W", "Return", "space", "S"):
+                before = s.capture()
+                s.key(key)
+                s.wait(1.0)
+                after = s.capture()
+                best = max(best, delta_px(before, after))
+                if best >= 20:
+                    break
             if best >= 20:
                 break
         assert best >= 20, (

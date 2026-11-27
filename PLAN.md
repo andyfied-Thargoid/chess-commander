@@ -135,9 +135,10 @@ legal moves on the start position). **Emulator oracle toolchain is built and
 verified:** FUSE 1.10.1 (ZX Spectrum, headless via Xvfb) and b2 (BBC Micro,
 headless via Xvfb) both boot the real sources; all 5 Spectrum sources are
 re-pulled and hashed (`SOURCE_HASHES.md`). Fidelity gates pending — the
-remaining work is the **reference-oracle driver**: (a) a screen-capture / RZX
-frame-decode front-end so the emulated screen can be read, (b) per-program
-position-input / move-output protocol discovery for all 7 programs, then (c):
+remaining work is the **reference-oracle driver**. The human-in-the-loop visual
+test (run on a machine with a display) is specified in
+[`references/visual-reference-oracle-test.md`](references/visual-reference-oracle-test.md);
+its output (`<backend>.oracle.json` per program) feeds the gates below:
 - [ ] Exact move match on positions with a unique reference choice (requires emulator verification)
 - [ ] Candidate-set or top-k match where ties exist
 - [ ] Tactical suite passes for checks, mates, captures, promotions, castling, en passant

@@ -37,11 +37,37 @@ from typing import List, Optional
 
 import PIL.Image
 
-# Xvfb display used for the virtual framebuffer. Chosen high to avoid clashing
-# with any real display. Must be 24-bit depth or mss refuses to grab it.
-DEFAULT_DISPLAY = ":97"
+# Xvfb display base used for the virtual framebuffer. Chosen high to avoid
+# clashing with any real display. Each session picks an unused number >= this
+# so two sessions (or a stale lock) cannot collide. Must be 24-bit depth or
+# mss refuses to grab it.
+DEFAULT_DISPLAY_BASE = 97
 XVFB_DEPTH = 24
 DEFAULT_SCREEN = "512x384x24"
+
+
+def _free_display(start: int = DEFAULT_DISPLAY_BASE, tries: int = 20) -> str:
+    """Pick a display number whose X11 lock/socket are free, starting at `start`.
+
+    A stale lock from a crashed session otherwise makes the next Xvfb die with
+    "Server is already active for display N" — the root cause of flaky runs.
+    """
+    for n in range(start, start + tries):
+        if not (os.path.exists(f"/tmp/.X{n+1}-lock")
+                or os.path.exists(f"/tmp/.X11-unix/X{n+1}")):
+            return f":{n+1}"
+    return f":{start + tries}"
+
+
+def _clear_display_lock(display: Optional[str]) -> None:
+    """Best-effort removal of a stale X11 lock/socket for `display`."""
+    if display and ":" in display and display[1:].isdigit():
+        n = int(display[1:])
+        for p in (f"/tmp/.X{n}-lock", f"/tmp/.X11-unix/X{n}"):
+            try:
+                os.remove(p)
+            except OSError:
+                pass
 
 
 class EmuError(RuntimeError):
@@ -60,14 +86,15 @@ class EmuSession:
         emulator: absolute path to the emulator binary (e.g. FUSE).
         source:   absolute path to the ROM/tape/ssd to load.
         emulator_args: extra args passed to the emulator (before the source).
-        display:  Xvfb display name (default :97).
+        display:  Xvfb display name, or None to auto-pick a free display
+                  (default). Pinned to a specific string to force one.
         screen:   Xvfb screen spec (default 512x384x24).
     """
 
     emulator: str
     source: str
     emulator_args: List[str] = field(default_factory=list)
-    display: str = DEFAULT_DISPLAY
+    display: Optional[str] = None  # None = auto-pick a free display
     screen: str = DEFAULT_SCREEN
     ld_library_path: Optional[str] = None  # e.g. /tmp/lspec/lib for FUSE
 
@@ -86,6 +113,9 @@ class EmuSession:
         for tool in ("Xvfb", "xdotool"):
             if not _have(tool):
                 raise EmuError(f"required tool missing: {tool}")
+        # Pick a free display unless the caller pinned one explicitly.
+        if self.display is None:
+            self.display = _free_display()
 
     @property
     def running(self) -> bool:
@@ -94,42 +124,54 @@ class EmuSession:
     def start(self, boot_wait: float = 6.0) -> "EmuSession":
         """Start Xvfb + the emulator, wait for boot, return self.
 
-        Raises EmuError if Xvfb or the emulator fails to come up.
+        Raises EmuError if Xvfb or the emulator fails to come up. On failure
+        the display lock is cleared and any partially-started process stopped,
+        so a crashed session cannot poison the next one.
         """
         if self.running or self._xvfb is not None:
             raise EmuError("session already started")
 
-        # Xvfb
-        self._xvfb = subprocess.Popen(
-            ["Xvfb", self.display, "-screen", "0", self.screen,
-             "-ac", "-nolisten", "tcp"],
-            stdout=open(self._log_xvfb, "w"), stderr=subprocess.STDOUT,
-        )
-        time.sleep(1.0)
-        if self._xvfb.poll() is not None:
-            raise EmuError("Xvfb exited at startup; see " + self._log_xvfb)
-
-        self._env = {
-            "DISPLAY": self.display,
-            "LD_LIBRARY_PATH": self.ld_library_path or os.environ.get("LD_LIBRARY_PATH", ""),
-        }
-
-        # Emulator
-        cmd = [self.emulator, *self.emulator_args, self.source]
-        self._emu = subprocess.Popen(
-            cmd, env=self._env,
-            stdout=open(self._log_emu, "w"), stderr=subprocess.STDOUT,
-        )
-        time.sleep(boot_wait)
-        if self._emu.poll() is not None:
-            raise EmuError(
-                f"emulator exited at startup (rc={self._emu.returncode}); "
-                "see " + self._log_emu
+        assert self.display is not None  # resolved in __post_init__
+        _clear_display_lock(self.display)  # drop a stale lock for this display
+        try:
+            # Xvfb
+            self._xvfb = subprocess.Popen(
+                ["Xvfb", self.display, "-screen", "0", self.screen,
+                 "-ac", "-nolisten", "tcp"],
+                stdout=open(self._log_xvfb, "w"), stderr=subprocess.STDOUT,
             )
+            time.sleep(1.0)
+            if self._xvfb.poll() is not None:
+                raise EmuError("Xvfb exited at startup; see " + self._log_xvfb)
+
+            self._env = {
+                "DISPLAY": self.display,
+                "LD_LIBRARY_PATH": self.ld_library_path or os.environ.get("LD_LIBRARY_PATH", ""),
+            }
+
+            # Emulator
+            cmd = [self.emulator, *self.emulator_args, self.source]
+            self._emu = subprocess.Popen(
+                cmd, env=self._env,
+                stdout=open(self._log_emu, "w"), stderr=subprocess.STDOUT,
+            )
+            time.sleep(boot_wait)
+            if self._emu.poll() is not None:
+                raise EmuError(
+                    f"emulator exited at startup (rc={self._emu.returncode}); "
+                    "see " + self._log_emu
+                )
+        except EmuError:
+            self.stop()
+            _clear_display_lock(self.display)
+            raise
         return self
 
     def stop(self) -> None:
-        """Terminate the emulator then Xvfb. Safe to call multiple times."""
+        """Terminate the emulator then Xvfb. Safe to call multiple times.
+
+        Also clears the display lock so the next session can reuse the number.
+        """
         for proc in (self._emu, self._xvfb):
             if proc is not None and proc.poll() is None:
                 proc.terminate()
@@ -139,6 +181,7 @@ class EmuSession:
                     proc.kill()
         self._emu = None
         self._xvfb = None
+        _clear_display_lock(self.display)
 
     def __enter__(self) -> "EmuSession":
         return self.start()
@@ -177,29 +220,42 @@ class EmuSession:
 
     # ---- input -----------------------------------------------------------
 
-    def focus_window(self) -> bool:
+    def focus_window(self, retries: int = 10, interval: float = 0.3) -> bool:
         """Give the emulator window keyboard focus (returns True on success).
 
-        Under Xvfb the freshly-mapped emulator window does not always hold
-        focus; xdotool key/type events are delivered to the focused window, so
-        we must focus the emulator first or the keys go nowhere.
+        Xvfb has no window manager, so ``xdotool windowactivate`` fails with
+        "_NET_ACTIVE_WINDOW not supported". Instead we find the FUSE window by
+        name and send XSetInputFocus directly via ``windowfocus`` (no WM
+        needed). Because the window can still be mapping when we first try,
+        we retry until ``getwindowfocus`` confirms the FUSE window actually
+        holds focus. Returns True if focus was confirmed, False if not.
         """
         if not self.running:
             raise EmuError("no emulator running")
+        assert self.display is not None  # resolved in __post_init__
         env = dict(os.environ, DISPLAY=self.display)
-        # Activate the window titled by the emulator (FUSE window title is
-        # "FUSE ..."); fall back to focusing whatever is frontmost.
         r = subprocess.run(
-            ["xdotool", "search", "--name", "FUSE", "windowactivate",
-             "sync", "windowfocus", "sync"],
-            env=env, capture_output=True,
+            ["xdotool", "search", "--name", "fuse"],
+            env=env, capture_output=True, text=True,
         )
-        if r.returncode != 0:
-            # No FUSE-titled window; focus the active window as a best effort.
-            subprocess.run(["xdotool", "getactivewindow", "windowfocus"],
-                           env=env, capture_output=True)
+        wids = r.stdout.split()
+        if not wids:
             return False
-        return True
+        # FUSE maps a parent + child window; the emulated screen is the leaf
+        # (last) window, so focus that one.
+        wid = wids[-1]
+        for _ in range(retries):
+            # XSetInputFocus directly; no window manager required.
+            subprocess.run(["xdotool", "windowfocus", wid],
+                           env=env, capture_output=True)
+            got = subprocess.run(
+                ["xdotool", "getwindowfocus"],
+                env=env, capture_output=True, text=True,
+            ).stdout.strip()
+            if got == wid:
+                return True
+            time.sleep(interval)
+        return False
 
     def key(self, *keys: str, delay: float = 0.25) -> None:
         """Press one or more keys (xdotool key). E.g. key('Return').

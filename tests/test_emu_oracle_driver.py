@@ -45,9 +45,13 @@ def test_missing_source_raises():
 
 
 def test_default_display_and_depth():
-    # 24-bit depth is required for mss; :97 avoids clashing with real displays.
-    assert mod.DEFAULT_DISPLAY == ":97"
+    # 24-bit depth is required for mss. The display is auto-picked (None) to
+    # avoid colliding with any real or stale display; the base is a high
+    # number so the free picker stays clear of real displays.
     assert "24" in mod.DEFAULT_SCREEN
+    assert mod.DEFAULT_DISPLAY_BASE >= 97
+    s = EmuSession(FUSE, SPECTRUM_I)
+    assert s.display.startswith(":") and int(s.display[1:]) >= 97
 
 
 def test_running_false_before_start():

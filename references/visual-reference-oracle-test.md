@@ -10,16 +10,30 @@ interactively).
 ## Purpose and audience
 
 The Phase 3 fidelity gates compare each **native Python backend** against the
-**real emulated reference program** on the same position. compute01 can run the
-emulators headlessly but **cannot see the screen**, so it cannot drive these
-1980s programs or read the moves they choose. This test is run **on the t14**,
-where a human can watch the screen and type. The t14 operator's job is to
-produce, for each program and each position, the program's chosen move (and its
-candidate set where visible), so the gate can be scored.
+**real emulated reference program** on the same position.
+
+**compute01 CAN see and drive the emulated screen** — verified 2026-11-27. It
+runs the emulators headlessly under **Xvfb** (a virtual framebuffer, no physical
+display needed) and captures the screen with **mss** (X11 `XGetImage`), injecting
+keys with **xdotool**. A FUSE + Spectrum Chess I boot frame and a keyboard-injection
+frame are saved in this directory as proof. So the "a human must sit at a
+display" assumption that originally motivated this document is **no longer
+required**: the oracle can be driven from compute01 directly.
+
+**What this means for the work.** The visual test can now be run **on compute01**
+as an automated (or semi-automated) oracle driver: boot each program under Xvfb,
+inject the keys to reach the position, capture the screen, and read the move the
+program plays. The remaining human effort is *decoding the screen* — the
+emulated programs use 1980s graphical move-entry (arrows, on-screen cursors,
+non-standard notation) that is not always trivially machine-readable, so some
+frames still benefit from a human reading them. The t14 remains a valid
+**fallback** for any program whose I/O is too hard to automate, but it is no
+longer the *only* path.
 
 This document is the full spec: what to run, how to set up each program, exactly
 which positions to test, and the deliverable format. It is self-contained — the
-operator does not need any prior context.
+operator (human on t14, or an automated driver on compute01) does not need any
+prior context.
 
 ## The core constraint (read this first)
 
@@ -41,21 +55,39 @@ Task A is required for all seven. Task B is required for as many positions as
 each program actually allows. Where a program cannot be set to a position, that
 is a **finding to record**, not a failure.
 
-## Environment (what the t14 needs)
+## Environment
+
+### compute01 (verified headless capture + drive toolchain — 2026-11-27)
+
+This is the **primary** path. All components are present and working on
+compute01:
 
 | Item | Value |
 |------|-------|
-| Emulators | **FUSE** (ZX Spectrum) and **b2** (BBC Micro). If the t14 lacks them, see "Build" below or use any equivalent recent build. |
-| Sources | The seven files listed below. |
-| Display | Any; the point is a human can see the screen and type. |
-| Not needed | Network, GPU, audio (disable it — these have no useful sound). |
+| Emulators | **FUSE** `/home/andyfied/src/fuse-emulator/fuse` (ZX Spectrum); **b2** `/home/andyfied/src/b2/` (BBC Micro — rebuild if no binary). |
+| Virtual display | **Xvfb** (`/usr/bin/Xvfb`) at 24-bit depth — required, 16-bit fails with mss. |
+| Screen capture | **mss** (X11 `XGetImage`) in the repo venv, frames saved as PNG via PIL. |
+| Keyboard input | **xdotool** (`/usr/bin/xdotool`). |
+| Sources | The seven files listed below (hashes in `SOURCE_HASHES.md`). |
+| Not needed | Network, GPU, audio (`--no-sound` — no useful sound). |
 
-> **If the emulators are not on the t14:** the pre-built binaries and build
-> scripts are on compute01 under `/home/andyfied/src/fuse-emulator/` and
-> `/home/andyfied/src/b2/` (see the `chess-fidelity-emulators` skill for the
-> exact build path). Easiest path: copy the source files below to the t14 and
-> use any standard FUSE + b2 build. FUSE runs a `.tap`/`.tzx`/`.z80`; b2 runs a
-> `.ssd`.
+Verified: FUSE + Spectrum Chess I boots under Xvfb and renders a non-blank
+screen (grey board + blue Spectrum region, ~4.5k blue px); a `Return` keypress
+via xdotool produced a visible screen change (cursor-cell update at
+(400,129)–(424,137)). Boot + injection frames:
+[`fuse-screen-capture-proof.png`](fuse-screen-capture-proof.png) in this
+directory.
+
+> **b2 note:** the BBC `.ssd` pair (Acornsoft, Thompson) needs b2. The b2
+> source tree is at `/home/andyfied/src/b2/`; if `bin/` has no built binary,
+> build it (see the `chess-fidelity-emulators` skill) before running those two.
+
+### t14 (human fallback)
+
+If a program's graphical I/O is too hard to automate from compute01, the same
+test can be run on the **t14** with a human watching the screen and typing.
+Same emulators/sources; the t14 just adds a physical display + keyboard. The
+t14 is no longer the *only* path.
 
 ## The seven reference programs and their files
 

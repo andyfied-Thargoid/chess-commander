@@ -21,8 +21,9 @@ The per-program *navigation* (which keys reach a given position and how the
 move is displayed) is intentionally a separate concern — each 1980s program has
 its own graphical I/O. The primitives here are what's shared and testable.
 
-Only stdlib + mss + pillow (both already in the repo venv) are imported at
-module level, so importing this module never requires a display.
+Only stdlib + pillow are imported at module level; mss is imported lazily
+inside `capture()` (it needs a live DISPLAY). Importing this module therefore
+never requires a display.
 """
 
 from __future__ import annotations
@@ -59,7 +60,7 @@ class EmuSession:
         emulator: absolute path to the emulator binary (e.g. FUSE).
         source:   absolute path to the ROM/tape/ssd to load.
         emulator_args: extra args passed to the emulator (before the source).
-        display:  Xvfb display name (default :99).
+        display:  Xvfb display name (default :97).
         screen:   Xvfb screen spec (default 512x384x24).
     """
 
@@ -176,12 +177,41 @@ class EmuSession:
 
     # ---- input -----------------------------------------------------------
 
+    def focus_window(self) -> bool:
+        """Give the emulator window keyboard focus (returns True on success).
+
+        Under Xvfb the freshly-mapped emulator window does not always hold
+        focus; xdotool key/type events are delivered to the focused window, so
+        we must focus the emulator first or the keys go nowhere.
+        """
+        if not self.running:
+            raise EmuError("no emulator running")
+        env = dict(os.environ, DISPLAY=self.display)
+        # Activate the window titled by the emulator (FUSE window title is
+        # "FUSE ..."); fall back to focusing whatever is frontmost.
+        r = subprocess.run(
+            ["xdotool", "search", "--name", "FUSE", "windowactivate",
+             "sync", "windowfocus", "sync"],
+            env=env, capture_output=True,
+        )
+        if r.returncode != 0:
+            # No FUSE-titled window; focus the active window as a best effort.
+            subprocess.run(["xdotool", "getactivewindow", "windowfocus"],
+                           env=env, capture_output=True)
+            return False
+        return True
+
     def key(self, *keys: str, delay: float = 0.25) -> None:
-        """Press one or more keys (xdotool key). E.g. key('Return')."""
+        """Press one or more keys (xdotool key). E.g. key('Return').
+
+        Focuses the emulator window first so the keys actually reach it.
+        """
+        self.focus_window()
         self._xdotool(["key", *keys], delay)
 
     def type_text(self, text: str, delay: float = 0.05) -> None:
-        """Type a string (xdotool type)."""
+        """Type a string (xdotool type). Focuses the emulator window first."""
+        self.focus_window()
         self._xdotool(["type", "--", text], delay)
 
     def wait(self, seconds: float) -> None:

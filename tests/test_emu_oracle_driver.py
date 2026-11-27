@@ -112,21 +112,46 @@ def test_boot_and_capture_produces_nonblank_frame(tmp_path):
 
 
 @pytest.mark.skipif(not _tools_present(), reason="Xvfb/FUSE/sources not present")
-def test_keyboard_input_changes_screen(tmp_path):
-    """A keypress must change the framebuffer (proves input reaches the emu)."""
-    from PIL import Image, ImageChops
+def test_keyboard_input_reaches_emu(tmp_path):
+    """At least one keypress must visibly change the framebuffer.
+
+    Probing the Spectrum Chess I screen showed several keys change the display
+    (~128-150 px) once the tape has loaded, but delivery under Xvfb is
+    timing-sensitive (a single fixed key can be flaky). So this test tries a
+    small set of keys and passes if ANY of them visibly changes the screen —
+    a robust "input reaches the emu" signal — while still FAILING if none of
+    them do (i.e. xdotool is not delivering at all).
+
+    NOTE: per-key reliability (which exact key, and deterministically) is a
+    separate, harder problem to solve before the full oracle can be trusted.
+    """
+    from PIL import ImageChops
+
+    def delta_px(a, b):
+        d = ImageChops.difference(a, b)
+        bbox = d.getbbox()
+        if not bbox:
+            return 0
+        px = d.load()
+        return sum(1 for x in range(bbox[0], bbox[2])
+                   for y in range(bbox[1], bbox[3]) if any(px[x, y]))
+
     s = EmuSession(FUSE, SPECTRUM_I, emulator_args=["--no-sound"],
                    ld_library_path=LSP)
-    s.start(boot_wait=6.0)
+    s.start(boot_wait=8.0)
     try:
-        before = s.capture()
-        s.key("Return")
-        s.wait(1.0)
-        after = s.capture()
-        diff = ImageChops.difference(before, after)
-        # Some pixels should differ after a keypress; but do not hard-fail if
-        # the particular program ignores Return on its current screen — report
-        # via a soft assertion and leave the strong guarantee to the smoke run.
-        assert diff.getbbox() is not None or True  # documented, non-fatal
+        best = 0
+        for key in ("w", "W", "Return", "space", "S"):
+            before = s.capture()
+            s.key(key)
+            s.wait(1.0)
+            after = s.capture()
+            best = max(best, delta_px(before, after))
+            if best >= 20:
+                break
+        assert best >= 20, (
+            f"no keypress visibly changed the screen (best delta={best}px) — "
+            "xdotool input is not reaching the emu"
+        )
     finally:
         s.stop()

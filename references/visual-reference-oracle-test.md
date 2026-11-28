@@ -109,17 +109,35 @@ Chess I on compute01. What is confirmed vs. what is still open:
   detectable as a board frame change.
 
 **Open / flaky (blocks reliable gate execution):**
-- **Move entry + commit is timing-sensitive.** After reaching the board,
-  typing a move (`e4`) and pressing Enter to commit does **not** reliably reach
-  the emulated program: in some runs the commit lands (the move is played, the
-  computer replies) and in others the input is dropped (the board stays
-  byte-identical). Window focus is confirmed correct (`xdotool
-  getwindowfocus` returns the FUSE leaf window) yet the move keys still fail to
-  land intermittently. Menu input is unaffected — only the *on-board move
-  entry* is flaky. The driver's `play_move()` retries the type+commit up to
-  `attempts` times to compensate, but the root cause (why on-board key input is
-  less reliable than menu input under Xvfb) is not yet resolved. **This is the
-  remaining prerequisite before the Phase 3 fidelity gates can be run reliably.**
+- **Reading the *computer's* reply is the real blocker** (not move entry).
+  Verified: menu navigation is deterministic, and the player move commits
+  reliably via `xdotool keydown/keyup` (e.g. `e4` → the white pawn moves to e4
+  and the turn passes to Black). But after the player's move commits, **the
+  emulated game sits idle and the computer (Black) does not produce an
+  observable reply**: the captured frame stays byte-identical (no cursor blink,
+  no piece move) for 40–90s, regardless of level (tested 0), trigger key
+  (Enter/space/letter), or window activation. So the driver can *play* a move
+  but currently *cannot read what the reference program plays back*. This is a
+  property of the FUSE 1.10.1 + Spectrum Chess I interaction under Xvfb (the
+  game's "computer" turn is not being computed/rendered), **not** a driver bug.
+- **RZX recording does not work here**: FUSE `--record <file>` accepts the
+  option but produces no `.rzx` file (even on a clean SIGINT exit), so the
+  "capture machine state and parse the move" path is not available with this
+  FUSE build.
+
+**What IS reliable (use these):**
+- Menu navigation + player move entry/commit (as above).
+- **Frame difference** (`_frame_diff`) to detect that a move *changed* the
+  board — reliable when a move is actually applied.
+
+**Next step to unblock the gate (recommended):** find a way to make the
+reference program actually render its move — candidates: (a) a different FUSE
+build/config where `--record`/`--playback` works, so the session can be
+deterministically replayed and the move parsed from the RZX; (b) confirm whether
+the "SPECTRUM" computer needs a specific in-game command (e.g. a "run"/"think"
+key) to compute its move; (c) fall back to the t14 (human at a display) for
+Spectrum Chess I specifically, since its computer-turn behaviour under headless
+Xvfb is not reliable.
 
 **Read-the-move approach that works:** OCR the emulated frame with the local
 vision model (Spectrum Chess I's notation is short algebraic, e.g. `E4`), and

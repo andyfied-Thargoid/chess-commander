@@ -306,14 +306,13 @@ def test_navigate_sci_reaches_board_reliably(tmp_path):
 @pytest.mark.xfail(
     strict=False,
     reason=(
-        "Move entry/commit is timing-sensitive under Xvfb: menu navigation "
-        "(P/W/level) is deterministic, but typing a move (e.g. e4) + Enter to "
-        "commit does not reliably reach the emulated program — it lands in "
-        "some runs (computer then replies, e.g. 1...e5) and not others. This "
-        "test passes when the commit lands, is skipped/flaky otherwise. The "
-        "deterministic per-key move commit is a known open prerequisite for "
-        "the Phase 3 fidelity gates (see "
-        "references/visual-reference-oracle-test.md, Task A.2)."
+        "BLOCKER (not a driver bug): the player move (e4) commits reliably "
+        "under Xvfb, but the emulated Spectrum Chess I then sits idle and the "
+        "computer (Black) does not produce an observable reply — the frame "
+        "stays byte-identical for 40-90s regardless of level, trigger key, or "
+        "window activation. So the oracle can play a move but not yet read what "
+        "the reference program plays back. See references/"
+        "visual-reference-oracle-test.md, 'Verified findings' (Open/flaky)."
     ),
 )
 def test_navigate_to_board_and_read_computer_reply(tmp_path):

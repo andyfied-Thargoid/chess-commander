@@ -145,6 +145,52 @@ detect the computer's reply by **frame difference** between the frame before
 and after the player's move — far more reliable than asking an OCR model "did a
 piece move?" on every poll.
 
+## t14 procedure — Spectrum Chess I (the unblock path)
+
+Because the emulated computer's reply is not observable headlessly (above), the
+**t14 (a display + keyboard)** is the reliable path for reading Spectrum Chess
+I's moves. This is a self-contained run sheet — the operator needs no other
+context.
+
+**Prep (once, on the t14):**
+1. Confirm the exact source: `sha256sum` of `SpectrumChess_I.tzx` matches the
+   hash in `SOURCE_HASHES.md`.
+2. Launch FUSE: `fuse --machine=48 --no-sound SpectrumChess_I.tzx`. Press
+   **Enter** if it waits after the tape load. The `PLAY / ANALYSE / OR LOAD?`
+   menu appears.
+
+**Reach a playable game:**
+1. `P` (Play) → **Enter**.
+2. `YOUR COLOUR?(B,W):` → type `W` (you play White; the computer is Black) →
+   **Enter**. (Use `B` to flip which side the computer plays — record it.)
+3. `LEVEL OF PLAY? (0-6):` → type a level → **Enter**. Use **`0`** (weakest,
+   fastest) for a quick check; use the level you intend to compare against for
+   real captures. **Record the level.**
+
+**Play a move and read the computer's reply (the part that does NOT work
+headless — on a real display it is visible):**
+1. The board is in the standard starting position; it is White's (your) move.
+2. Enter your move in the program's notation — Spectrum Chess I takes the move
+   as text (short algebraic, e.g. type `e4`) then **Enter** to commit.
+3. **Watch the screen:** the computer (Black) will now move a black piece on
+   its own. Wait for it — at level 0 it is near-instant; at higher levels it
+   may take a few seconds. **This is the move to record.**
+4. Read the computer's move from the **screen**: the left status panel lists
+   the moves in the program's own notation (e.g. `E4` / `E5`), and the board
+   shows which black piece moved. Record it **verbatim**, then convert to UCI
+   (e.g. `e7e5`).
+
+**Repeat for each position you need** (see Task B). Spectrum Chess I cannot be
+set to an arbitrary FEN, so the only position you can reach is **`startpos`**
+(standard start). Record the computer's opening reply there, 3 times (to check
+determinism), at a fixed level. For any other corpus position, record
+`not_reachable` — do not approximate.
+
+**Deliverable:** `spectrum_chess.oracle.json` (schema in Task B), with entries
+for `startpos` (the computer's reply move, verbatim notation + UCI, the level
+used, and all 3 runs). If the computer's reply differs across the 3 runs, record
+every variant.
+
 ## The seven reference programs and their files
 
 | # | Backend | Program | File | Emulator | Notes |

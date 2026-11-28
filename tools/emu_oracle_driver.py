@@ -314,7 +314,7 @@ class EmuSession:
 
         Args:
             answer:        the text to send, e.g. ``"P\\r"`` (menu choice + CR)
-                           or ``"e4"`` (a chess move, committed separately).
+                           or ``"E2 E4\\r"`` (a full chess move and CR).
             char_delay_ms: per-character delay for ``xdotool type --delay``.
             settle:        seconds to wait after sending, so the program can
                            redraw before the next capture/step.
@@ -333,12 +333,13 @@ class EmuSession:
         time.sleep(settle)
 
     def commit_entry(self, key: str = "Return", settle: float = 2.0) -> None:
-        """Press a special key (default Enter) to commit the text currently in
-        the program's input field, then wait for the reaction.
+        """Press a special key (default Enter) to commit staged text and wait
+        for the reaction.
 
-        Verified for Spectrum Chess I: typing a move (e.g. ``type_answer("e4")``)
-        stages it, and ``commit_entry()`` (Enter) finalises the move and passes
-        the turn to the computer. Lower levels reply near-instantly; higher
+        This remains available for programs that stage text before a separate
+        commit. Spectrum Chess I is different: it requires the full source and
+        destination squares plus carriage return in one input unit, for example
+        ``type_answer("E2 E4\\r")``. Lower levels reply near-instantly; higher
         levels take longer to search (see ``wait_for_computer_reply``).
         """
         if not self.running:
@@ -434,18 +435,19 @@ def play_move(
     move: str,
     *,
     commit: str = "Return",
-    settle: float = 2.0,
+    settle: float = 0.0,
     attempts: int = 3,
 ) -> "PIL.Image.Image":
     """Enter one player move in the running game and commit it, returning the
     resulting frame (the computer will then start searching for its reply).
 
-    Spectrum Chess I accepts short algebraic move entry: type the destination
-    (or from-to) then press Enter to commit. The commit key delivery is
-    *timing-sensitive* under Xvfb (verified: sometimes Enter commits the move,
-    sometimes it is dropped), so this retries the type+commit up to
-    ``attempts`` times. After each commit it checks whether the move landed — a
-    landed move changes the board; a dropped commit leaves it byte-identical.
+    Spectrum Chess I accepts a full coordinate move with a space between the
+    source and destination squares, followed by carriage return, e.g.
+    ``E2 E4\\r``. The complete input must be delivered in one xdotool call;
+    sending the move and Enter separately leaves the program at the player
+    prompt. This retries the full input up to ``attempts`` times. After each
+    attempt it checks whether the move landed — a landed move changes the board;
+    an unaccepted input leaves it byte-identical.
     It returns as soon as the move is confirmed, or after the final attempt.
 
     The *authoritative* confirmation is a subsequent board change — pair this
@@ -453,16 +455,17 @@ def play_move(
 
     Args:
         s:       a started session already at the board.
-        move:    the move text to type, e.g. ``"e4"``.
-        commit:  key that commits the entry (default Enter).
-        settle:  seconds to wait after committing before checking.
+        move:    the full coordinate move to type, e.g. ``"E2 E4"``.
+        commit:  retained for compatibility with staged-input callers; the
+                 Spectrum Chess I path commits with carriage return in the same
+                 input unit.
+        settle:  seconds to wait after sending before checking.
         attempts: how many times to retry the type+commit (default 3).
     """
     baseline = s.capture()
     frame = baseline
     for _attempt in range(attempts):
-        s.type_answer(move, settle=1.0)
-        s.commit_entry(key=commit, settle=settle)
+        s.type_answer(f"{move}\\r", settle=settle)
         frame = s.capture()
         # A landed move changes the board (the piece moves, the status line
         # updates). A dropped commit leaves the board byte-identical.

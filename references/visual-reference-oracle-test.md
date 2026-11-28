@@ -104,22 +104,17 @@ Chess I on compute01. What is confirmed vs. what is still open:
 - The board renders in the standard starting position; the left status panel
   shows the move number, `SPECTRUM` / `PLAYER` (the two sides), and the current
   move entry.
-- **The loop works end-to-end** when the move commit lands: playing `e4` and
-  committing it makes the computer (Black, level 0) reply `e7→e5` (1...e5),
+- **The loop works end-to-end** when the move is entered in full coordinate
+  notation: sending `E2 E4` plus carriage return makes the computer (Black,
+  level 0) reply `E7-E5` (1...e5),
   detectable as a board frame change.
 
-**Open / flaky (blocks reliable gate execution):**
-- **Reading the *computer's* reply is the real blocker** (not move entry).
-  Verified: menu navigation is deterministic, and the player move commits
-  reliably via `xdotool keydown/keyup` (e.g. `e4` → the white pawn moves to e4
-  and the turn passes to Black). But after the player's move commits, **the
-  emulated game sits idle and the computer (Black) does not produce an
-  observable reply**: the captured frame stays byte-identical (no cursor blink,
-  no piece move) for 40–90s, regardless of level (tested 0), trigger key
-  (Enter/space/letter), or window activation. So the driver can *play* a move
-  but currently *cannot read what the reference program plays back*. This is a
-  property of the FUSE 1.10.1 + Spectrum Chess I interaction under Xvfb (the
-  game's "computer" turn is not being computed/rendered), **not** a driver bug.
+**Remaining limitations:**
+- **Destination-only move entry was the blocker, not the emulator display.**
+  Sending `e4` left the program at the player prompt with no computer reply.
+  The verified input is the full source and destination, `E2 E4`, followed by
+  carriage return in the same xdotool call. That produces the visible reply
+  `E7-E5` at level 0 under both Xvfb and the forwarded T14 display.
 - **RZX recording does not work here**: FUSE `--record <file>` accepts the
   option but produces no `.rzx` file (even on a clean SIGINT exit), so the
   "capture machine state and parse the move" path is not available with this
@@ -167,11 +162,11 @@ context.
    fastest) for a quick check; use the level you intend to compare against for
    real captures. **Record the level.**
 
-**Play a move and read the computer's reply (the part that does NOT work
-headless — on a real display it is visible):**
+**Play a move and read the computer's reply (works headless with the verified
+full-coordinate input; the T14 display remains a fallback for visual checks):**
 1. The board is in the standard starting position; it is White's (your) move.
-2. Enter your move in the program's notation — Spectrum Chess I takes the move
-   as text (short algebraic, e.g. type `e4`) then **Enter** to commit.
+2. Enter your move in the program's notation — Spectrum Chess I takes the full
+   coordinate form (e.g. type `E2 E4` plus carriage return in one input unit).
 3. **Watch the screen:** the computer (Black) will now move a black piece on
    its own. Wait for it — at level 0 it is near-instant; at higher levels it
    may take a few seconds. **This is the move to record.**

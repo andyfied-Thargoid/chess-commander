@@ -251,17 +251,13 @@ def test_navigate_sci_rejects_bad_level():
     assert r.calls == []
 
 
-def test_play_move_types_then_commits():
-    """play_move must type the move (no terminator) then commit with Enter — the
-    two-step that Spectrum Chess I requires. It retries up to ``attempts`` times
-    if the commit didn't land; the first attempt is type-then-commit."""
+def test_play_move_sends_full_move_unit():
+    """play_move must send a full move plus carriage return as one input unit.
+    Spectrum Chess I rejects the destination-only/two-step form."""
     r = _RecordingSession()
-    mod.play_move(r, "e4", attempts=2)
-    # First attempt is exactly: type the move, then commit with Enter.
-    assert r.calls[:2] == [("type", "e4"), ("commit", "Return")]
-    # It retried a second time (the fake session never changes the board, so the
-    # retry loop runs to the max), so a second type+commit pair follows.
-    assert r.calls[2:4] == [("type", "e4"), ("commit", "Return")]
+    mod.play_move(r, "E2 E4", attempts=2)
+    assert r.calls[:1] == [("type", "E2 E4\\r")]
+    assert r.calls[1:2] == [("type", "E2 E4\\r")]
 
 
 def test_frame_diff_zero_for_identical_frames():
@@ -303,21 +299,9 @@ def test_navigate_sci_reaches_board_reliably(tmp_path):
 
 
 @pytest.mark.skipif(not _tools_present(), reason="Xvfb/FUSE/sources not present")
-@pytest.mark.xfail(
-    strict=False,
-    reason=(
-        "BLOCKER (not a driver bug): the player move (e4) commits reliably "
-        "under Xvfb, but the emulated Spectrum Chess I then sits idle and the "
-        "computer (Black) does not produce an observable reply — the frame "
-        "stays byte-identical for 40-90s regardless of level, trigger key, or "
-        "window activation. So the oracle can play a move but not yet read what "
-        "the reference program plays back. See references/"
-        "visual-reference-oracle-test.md, 'Verified findings' (Open/flaky)."
-    ),
-)
 def test_navigate_to_board_and_read_computer_reply(tmp_path):
     """End-to-end: boot Spectrum Chess I, navigate to the board as White at
-    level 0, play e4, and confirm the computer (Black) replies by moving the
+    level 0, play E2 E4, and confirm the computer (Black) replies by moving the
     e-pawn. This is the core oracle loop the Phase 3 fidelity gates depend on.
 
     Level 0 is used because the computer replies near-instantly; a higher level
@@ -335,7 +319,7 @@ def test_navigate_to_board_and_read_computer_reply(tmp_path):
                     for y in range(0, board.height, 4)}
         assert len(distinct) > 10, f"board frame looks blank: {len(distinct)} colors"
 
-        before = mod.play_move(s, "e4")
+        before = mod.play_move(s, "E2 E4")
         # The computer's reply: board must change (a piece moves).
         reply = mod.wait_for_computer_reply(s, before, timeout=60.0, poll=3.0)
         changed = mod._frame_diff(before, reply)

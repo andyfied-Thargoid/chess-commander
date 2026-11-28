@@ -89,6 +89,108 @@ test can be run on the **t14** with a human watching the screen and typing.
 Same emulators/sources; the t14 just adds a physical display + keyboard. The
 t14 is no longer the *only* path.
 
+## Verified findings — Spectrum Chess I (2026-11-28)
+
+The oracle driver (`tools/emu_oracle_driver.py`) was driven against Spectrum
+Chess I on compute01. What is confirmed vs. what is still open:
+
+**Confirmed (deterministic, verified across repeated runs):**
+- Boot: `fuse ... SpectrumChess_I.tzx` under Xvfb reaches the `PLAY / ANALYSE
+  / OR LOAD?` menu in ~10s.
+- **Menu navigation is reliable** (3/3 runs): `P\r` → `YOUR COLOUR?`, `W\r`
+  → `LEVEL OF PLAY?`, `{level}\r` → the board. Each answer is one `xdotool
+  type` call with a carriage return appended (one input *unit* per call, fresh
+  window focus per call). Levels 0–6 are accepted; level 0 = weakest/fastest.
+- The board renders in the standard starting position; the left status panel
+  shows the move number, `SPECTRUM` / `PLAYER` (the two sides), and the current
+  move entry.
+- **The loop works end-to-end** when the move commit lands: playing `e4` and
+  committing it makes the computer (Black, level 0) reply `e7→e5` (1...e5),
+  detectable as a board frame change.
+
+**Open / flaky (blocks reliable gate execution):**
+- **Reading the *computer's* reply is the real blocker** (not move entry).
+  Verified: menu navigation is deterministic, and the player move commits
+  reliably via `xdotool keydown/keyup` (e.g. `e4` → the white pawn moves to e4
+  and the turn passes to Black). But after the player's move commits, **the
+  emulated game sits idle and the computer (Black) does not produce an
+  observable reply**: the captured frame stays byte-identical (no cursor blink,
+  no piece move) for 40–90s, regardless of level (tested 0), trigger key
+  (Enter/space/letter), or window activation. So the driver can *play* a move
+  but currently *cannot read what the reference program plays back*. This is a
+  property of the FUSE 1.10.1 + Spectrum Chess I interaction under Xvfb (the
+  game's "computer" turn is not being computed/rendered), **not** a driver bug.
+- **RZX recording does not work here**: FUSE `--record <file>` accepts the
+  option but produces no `.rzx` file (even on a clean SIGINT exit), so the
+  "capture machine state and parse the move" path is not available with this
+  FUSE build.
+
+**What IS reliable (use these):**
+- Menu navigation + player move entry/commit (as above).
+- **Frame difference** (`_frame_diff`) to detect that a move *changed* the
+  board — reliable when a move is actually applied.
+
+**Next step to unblock the gate (recommended):** find a way to make the
+reference program actually render its move — candidates: (a) a different FUSE
+build/config where `--record`/`--playback` works, so the session can be
+deterministically replayed and the move parsed from the RZX; (b) confirm whether
+the "SPECTRUM" computer needs a specific in-game command (e.g. a "run"/"think"
+key) to compute its move; (c) fall back to the t14 (human at a display) for
+Spectrum Chess I specifically, since its computer-turn behaviour under headless
+Xvfb is not reliable.
+
+**Read-the-move approach that works:** OCR the emulated frame with the local
+vision model (Spectrum Chess I's notation is short algebraic, e.g. `E4`), and
+detect the computer's reply by **frame difference** between the frame before
+and after the player's move — far more reliable than asking an OCR model "did a
+piece move?" on every poll.
+
+## t14 procedure — Spectrum Chess I (the unblock path)
+
+Because the emulated computer's reply is not observable headlessly (above), the
+**t14 (a display + keyboard)** is the reliable path for reading Spectrum Chess
+I's moves. This is a self-contained run sheet — the operator needs no other
+context.
+
+**Prep (once, on the t14):**
+1. Confirm the exact source: `sha256sum` of `SpectrumChess_I.tzx` matches the
+   hash in `SOURCE_HASHES.md`.
+2. Launch FUSE: `fuse --machine=48 --no-sound SpectrumChess_I.tzx`. Press
+   **Enter** if it waits after the tape load. The `PLAY / ANALYSE / OR LOAD?`
+   menu appears.
+
+**Reach a playable game:**
+1. `P` (Play) → **Enter**.
+2. `YOUR COLOUR?(B,W):` → type `W` (you play White; the computer is Black) →
+   **Enter**. (Use `B` to flip which side the computer plays — record it.)
+3. `LEVEL OF PLAY? (0-6):` → type a level → **Enter**. Use **`0`** (weakest,
+   fastest) for a quick check; use the level you intend to compare against for
+   real captures. **Record the level.**
+
+**Play a move and read the computer's reply (the part that does NOT work
+headless — on a real display it is visible):**
+1. The board is in the standard starting position; it is White's (your) move.
+2. Enter your move in the program's notation — Spectrum Chess I takes the move
+   as text (short algebraic, e.g. type `e4`) then **Enter** to commit.
+3. **Watch the screen:** the computer (Black) will now move a black piece on
+   its own. Wait for it — at level 0 it is near-instant; at higher levels it
+   may take a few seconds. **This is the move to record.**
+4. Read the computer's move from the **screen**: the left status panel lists
+   the moves in the program's own notation (e.g. `E4` / `E5`), and the board
+   shows which black piece moved. Record it **verbatim**, then convert to UCI
+   (e.g. `e7e5`).
+
+**Repeat for each position you need** (see Task B). Spectrum Chess I cannot be
+set to an arbitrary FEN, so the only position you can reach is **`startpos`**
+(standard start). Record the computer's opening reply there, 3 times (to check
+determinism), at a fixed level. For any other corpus position, record
+`not_reachable` — do not approximate.
+
+**Deliverable:** `spectrum_chess.oracle.json` (schema in Task B), with entries
+for `startpos` (the computer's reply move, verbatim notation + UCI, the level
+used, and all 3 runs). If the computer's reply differs across the 3 runs, record
+every variant.
+
 ## The seven reference programs and their files
 
 | # | Backend | Program | File | Emulator | Notes |

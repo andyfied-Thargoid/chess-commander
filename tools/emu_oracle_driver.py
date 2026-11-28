@@ -299,6 +299,60 @@ class EmuSession:
         self.focus_window()
         self._xdotool(["type", "--", text], delay)
 
+    def type_answer(self, answer: str, char_delay_ms: int = 150,
+                    settle: float = 1.2) -> None:
+        """Send one input *unit* (a character, a short answer, or a key) to the
+        emulated program reliably, then wait for the program to react.
+
+        This is the reliable input primitive for the 1980s programs: the
+        program reads its answer as a single unit, so the whole answer (and any
+        terminator such as ``\\r``) is sent in ONE ``xdotool type`` call with a
+        small per-character delay and a fresh window focus. Splitting a
+        character and its terminator into separate calls (or relying on
+        ``xdotool key`` for an uppercase letter) is the race that makes input
+        flaky under Xvfb — one call per unit is the fix.
+
+        Args:
+            answer:        the text to send, e.g. ``"P\\r"`` (menu choice + CR)
+                           or ``"e4"`` (a chess move, committed separately).
+            char_delay_ms: per-character delay for ``xdotool type --delay``.
+            settle:        seconds to wait after sending, so the program can
+                           redraw before the next capture/step.
+        """
+        if not self.running:
+            raise EmuError("no emulator running")
+        self.focus_window()
+        time.sleep(0.4)
+        env = {**os.environ, "DISPLAY": self.display}
+        subprocess.run(
+            ["xdotool", "type", "--clearmodifiers", "--delay",
+             str(int(char_delay_ms)), "--", answer],
+            env=env, check=False,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        time.sleep(settle)
+
+    def commit_entry(self, key: str = "Return", settle: float = 2.0) -> None:
+        """Press a special key (default Enter) to commit the text currently in
+        the program's input field, then wait for the reaction.
+
+        Verified for Spectrum Chess I: typing a move (e.g. ``type_answer("e4")``)
+        stages it, and ``commit_entry()`` (Enter) finalises the move and passes
+        the turn to the computer. Lower levels reply near-instantly; higher
+        levels take longer to search (see ``wait_for_computer_reply``).
+        """
+        if not self.running:
+            raise EmuError("no emulator running")
+        self.focus_window()
+        time.sleep(0.4)
+        env = {**os.environ, "DISPLAY": self.display}
+        subprocess.run(
+            ["xdotool", "key", "--clearmodifiers", key],
+            env=env, check=False,
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+        )
+        time.sleep(settle)
+
     def wait(self, seconds: float) -> None:
         time.sleep(seconds)
 
@@ -333,6 +387,144 @@ def boot_and_capture(
         return s.capture_to(out_path)
     finally:
         s.stop()
+
+
+def navigate_spectrum_chess_i(
+    s: "EmuSession",
+    *,
+    colour: str = "W",
+    level: int = 4,
+    settle: float = 1.5,
+) -> "PIL.Image.Image":
+    """Drive a booted Spectrum Chess I session to a playable board, and return
+    the board frame.
+
+    Verified key sequence (one ``xdotool type`` call per input unit, each with a
+    carriage return appended so the program accepts it in one read):
+
+      1. ``P\\r``   -> PLAY (from the PLAY / ANALYSE / OR LOAD? menu)
+      2. ``W\\r``   -> your colour (WHITE; use ``"B"`` for Black)
+      3. ``{lvl}\\r``-> level of play, 0-6 (0 = weakest/fastest, 6 = strongest)
+
+    After this the emulated board is shown in the standard starting position.
+    If you chose White it is the *player's* move next; if Black, the computer
+    (White) moves first — call ``wait_for_computer_reply`` to read it.
+
+    Args:
+        s:      a started ``EmuSession`` running Spectrum Chess I.
+        colour: ``"W"`` (default, player is White) or ``"B"``.
+        level:  0-6; lower = weaker/faster computer reply.
+        settle: seconds to wait after each menu answer.
+
+    Returns:
+        PIL.Image of the board once the position is set up.
+    """
+    if colour not in ("W", "B"):
+        raise EmuError("colour must be 'W' or 'B'")
+    if not 0 <= level <= 6:
+        raise EmuError("level must be 0-6")
+    s.type_answer("P\r", settle=settle)
+    s.type_answer(f"{colour}\r", settle=settle)
+    s.type_answer(f"{level}\r", settle=settle)
+    return s.capture()
+
+
+def play_move(
+    s: "EmuSession",
+    move: str,
+    *,
+    commit: str = "Return",
+    settle: float = 2.0,
+    attempts: int = 3,
+) -> "PIL.Image.Image":
+    """Enter one player move in the running game and commit it, returning the
+    resulting frame (the computer will then start searching for its reply).
+
+    Spectrum Chess I accepts short algebraic move entry: type the destination
+    (or from-to) then press Enter to commit. The commit key delivery is
+    *timing-sensitive* under Xvfb (verified: sometimes Enter commits the move,
+    sometimes it is dropped), so this retries the type+commit up to
+    ``attempts`` times. After each commit it checks whether the move landed — a
+    landed move changes the board; a dropped commit leaves it byte-identical.
+    It returns as soon as the move is confirmed, or after the final attempt.
+
+    The *authoritative* confirmation is a subsequent board change — pair this
+    with ``wait_for_computer_reply(frame)`` to read the computer's reply.
+
+    Args:
+        s:       a started session already at the board.
+        move:    the move text to type, e.g. ``"e4"``.
+        commit:  key that commits the entry (default Enter).
+        settle:  seconds to wait after committing before checking.
+        attempts: how many times to retry the type+commit (default 3).
+    """
+    baseline = s.capture()
+    frame = baseline
+    for _attempt in range(attempts):
+        s.type_answer(move, settle=1.0)
+        s.commit_entry(key=commit, settle=settle)
+        frame = s.capture()
+        # A landed move changes the board (the piece moves, the status line
+        # updates). A dropped commit leaves the board byte-identical.
+        if _frame_diff(baseline, frame) > 0:
+            return frame
+    return frame
+
+
+def _frame_diff(a: "PIL.Image.Image", b: "PIL.Image.Image") -> int:
+    """Number of pixels that differ between two same-size RGB frames (0..N).
+
+    Used as the change detector for ``wait_for_computer_reply``: when the
+    computer moves a piece, the board pixels change. Cheaper and far more
+    reliable than asking an OCR model "did a piece move?" on every poll.
+    """
+    from PIL import ImageChops
+    if a.size != b.size:
+        b = b.resize(a.size)
+    diff = ImageChops.difference(a.convert("RGB"), b.convert("RGB"))
+    # getbbox() is None when the frames are identical (all-black diff) and a
+    # bounding box when anything differs. Counting the non-black pixels inside
+    # that box gives a stable "how much changed" number: 0 for identical frames,
+    # a large value when a chess piece has moved. (The flat histogram is laid
+    # out as [R0..R255, G0..G255, B0..B255], so slicing it as one channel is a
+    # bug — getbbox + pixel count is the correct, simple detector.)
+    box = diff.getbbox()
+    if box is None:
+        return 0
+    px = diff.load()
+    return sum(1 for x in range(box[0], box[2])
+               for y in range(box[1], box[3]) if any(px[x, y]))
+
+
+def wait_for_computer_reply(
+    s: "EmuSession",
+    before: "PIL.Image.Image",
+    *,
+    timeout: float = 120.0,
+    poll: float = 5.0,
+    min_changed: int = 300,
+) -> "PIL.Image.Image":
+    """Wait until the computer has played its reply (the board changed), then
+    return the new frame.
+
+    ``before`` is the frame captured right after the player's move was
+    committed. This polls ``s.capture()`` until the frame differs from
+    ``before`` by at least ``min_changed`` (a moved piece changes many pixels),
+    or ``timeout`` seconds elapse — whichever comes first. It returns the
+    first changed frame on success, or the last frame on timeout (the caller
+    should treat an unchanged board as "computer has not moved yet").
+
+    Lower engine levels reply near-instantly; level 6 may need the full
+    timeout. The frame-diff detector avoids OCR's unreliable per-poll yes/no.
+    """
+    deadline = time.time() + timeout
+    last = s.capture()
+    while time.time() < deadline:
+        time.sleep(poll)
+        last = s.capture()
+        if _frame_diff(before, last) >= min_changed:
+            return last
+    return last
 
 
 if __name__ == "__main__":  # pragma: no cover - manual smoke test

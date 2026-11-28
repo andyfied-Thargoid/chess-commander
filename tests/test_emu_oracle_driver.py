@@ -191,3 +191,158 @@ def test_keyboard_input_reaches_emu(tmp_path):
         )
     finally:
         s.stop()
+
+
+# ---- navigation helper logic (always run, no display) --------------------
+
+class _RecordingSession:
+    """Fake EmuSession that records input calls without touching a display.
+
+    Lets us unit-test the navigation/move-entry helpers' *call sequence* (which
+    answers are sent, in what order) without booting Xvfb/FUSE.
+    """
+
+    def __init__(self) -> None:
+        self.calls: list = []
+        self.running = True
+
+    def focus_window(self, *a, **k) -> bool:
+        return True
+
+    def capture(self):
+        from PIL import Image
+        return Image.new("RGB", (8, 8), (0, 0, 0))
+
+    def type_answer(self, answer, **kw):
+        self.calls.append(("type", answer))
+
+    def commit_entry(self, key="Return", **kw):
+        self.calls.append(("commit", key))
+
+    def wait(self, seconds):
+        pass
+
+
+def test_navigate_sci_menu_sequence():
+    """navigate_spectrum_chess_i must send PLAY, then colour, then level — one
+    input unit (with \\r) each, in that order."""
+    r = _RecordingSession()
+    mod.navigate_spectrum_chess_i(r, colour="W", level=4)
+    assert r.calls == [("type", "P\r"), ("type", "W\r"), ("type", "4\r")]
+
+
+def test_navigate_sci_black_and_level_zero():
+    r = _RecordingSession()
+    mod.navigate_spectrum_chess_i(r, colour="B", level=0)
+    assert r.calls == [("type", "P\r"), ("type", "B\r"), ("type", "0\r")]
+
+
+def test_navigate_sci_rejects_bad_colour():
+    r = _RecordingSession()
+    with pytest.raises(EmuError, match="colour"):
+        mod.navigate_spectrum_chess_i(r, colour="X")
+    assert r.calls == []  # nothing sent before validation
+
+
+def test_navigate_sci_rejects_bad_level():
+    r = _RecordingSession()
+    with pytest.raises(EmuError, match="level"):
+        mod.navigate_spectrum_chess_i(r, level=7)
+    assert r.calls == []
+
+
+def test_play_move_types_then_commits():
+    """play_move must type the move (no terminator) then commit with Enter — the
+    two-step that Spectrum Chess I requires. It retries up to ``attempts`` times
+    if the commit didn't land; the first attempt is type-then-commit."""
+    r = _RecordingSession()
+    mod.play_move(r, "e4", attempts=2)
+    # First attempt is exactly: type the move, then commit with Enter.
+    assert r.calls[:2] == [("type", "e4"), ("commit", "Return")]
+    # It retried a second time (the fake session never changes the board, so the
+    # retry loop runs to the max), so a second type+commit pair follows.
+    assert r.calls[2:4] == [("type", "e4"), ("commit", "Return")]
+
+
+def test_frame_diff_zero_for_identical_frames():
+    from PIL import Image
+    a = Image.new("RGB", (4, 4), (10, 20, 30))
+    b = Image.new("RGB", (4, 4), (10, 20, 30))
+    assert mod._frame_diff(a, b) == 0
+
+
+def test_frame_diff_positive_for_changed_frame():
+    from PIL import Image
+    a = Image.new("RGB", (4, 4), (0, 0, 0))
+    b = Image.new("RGB", (4, 4), (255, 255, 255))
+    assert mod._frame_diff(a, b) > 0
+
+
+@pytest.mark.skipif(not _tools_present(), reason="Xvfb/FUSE/sources not present")
+def test_navigate_sci_reaches_board_reliably(tmp_path):
+    """Menu navigation (P -> colour -> level) is DETERMINISTIC: 3/3 runs reach
+    a non-blank board. This is the reliable half of the oracle; move entry is
+    the flaky half (see the xfail test below).
+    """
+    from PIL import Image
+    for _run in range(3):
+        s = EmuSession(FUSE, SPECTRUM_I, emulator_args=["--no-sound"],
+                       ld_library_path=LSP)
+        s.start(boot_wait=10.0)
+        try:
+            board = mod.navigate_spectrum_chess_i(s, colour="W", level=0)
+            px = board.load()
+            distinct = {px[x, y] for x in range(0, board.width, 4)
+                        for y in range(0, board.height, 4)}
+            assert len(distinct) > 10, (
+                f"navigation did not reach a non-blank board "
+                f"({len(distinct)} colors) — menu sequence is unreliable"
+            )
+        finally:
+            s.stop()
+
+
+@pytest.mark.skipif(not _tools_present(), reason="Xvfb/FUSE/sources not present")
+@pytest.mark.xfail(
+    strict=False,
+    reason=(
+        "BLOCKER (not a driver bug): the player move (e4) commits reliably "
+        "under Xvfb, but the emulated Spectrum Chess I then sits idle and the "
+        "computer (Black) does not produce an observable reply — the frame "
+        "stays byte-identical for 40-90s regardless of level, trigger key, or "
+        "window activation. So the oracle can play a move but not yet read what "
+        "the reference program plays back. See references/"
+        "visual-reference-oracle-test.md, 'Verified findings' (Open/flaky)."
+    ),
+)
+def test_navigate_to_board_and_read_computer_reply(tmp_path):
+    """End-to-end: boot Spectrum Chess I, navigate to the board as White at
+    level 0, play e4, and confirm the computer (Black) replies by moving the
+    e-pawn. This is the core oracle loop the Phase 3 fidelity gates depend on.
+
+    Level 0 is used because the computer replies near-instantly; a higher level
+    would make this test slow. The reply is detected by frame change (a moved
+    piece), then OCR-verified.
+    """
+    s = EmuSession(FUSE, SPECTRUM_I, emulator_args=["--no-sound"],
+                   ld_library_path=LSP)
+    s.start(boot_wait=10.0)
+    try:
+        board = mod.navigate_spectrum_chess_i(s, colour="W", level=0)
+        # The board frame must show the starting position (many colours, not blank).
+        px = board.load()
+        distinct = {px[x, y] for x in range(0, board.width, 4)
+                    for y in range(0, board.height, 4)}
+        assert len(distinct) > 10, f"board frame looks blank: {len(distinct)} colors"
+
+        before = mod.play_move(s, "e4")
+        # The computer's reply: board must change (a piece moves).
+        reply = mod.wait_for_computer_reply(s, before, timeout=60.0, poll=3.0)
+        changed = mod._frame_diff(before, reply)
+        assert changed >= 300, (
+            f"computer did not reply after 1.e4 (frame change={changed}) — "
+            "either the move was not accepted or the engine is stuck"
+        )
+        reply.save(str(tmp_path / "sci-reply.png"))
+    finally:
+        s.stop()

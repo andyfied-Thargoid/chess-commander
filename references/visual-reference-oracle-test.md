@@ -89,6 +89,44 @@ test can be run on the **t14** with a human watching the screen and typing.
 Same emulators/sources; the t14 just adds a physical display + keyboard. The
 t14 is no longer the *only* path.
 
+## Verified findings — Spectrum Chess I (2026-11-28)
+
+The oracle driver (`tools/emu_oracle_driver.py`) was driven against Spectrum
+Chess I on compute01. What is confirmed vs. what is still open:
+
+**Confirmed (deterministic, verified across repeated runs):**
+- Boot: `fuse ... SpectrumChess_I.tzx` under Xvfb reaches the `PLAY / ANALYSE
+  / OR LOAD?` menu in ~10s.
+- **Menu navigation is reliable** (3/3 runs): `P\r` → `YOUR COLOUR?`, `W\r`
+  → `LEVEL OF PLAY?`, `{level}\r` → the board. Each answer is one `xdotool
+  type` call with a carriage return appended (one input *unit* per call, fresh
+  window focus per call). Levels 0–6 are accepted; level 0 = weakest/fastest.
+- The board renders in the standard starting position; the left status panel
+  shows the move number, `SPECTRUM` / `PLAYER` (the two sides), and the current
+  move entry.
+- **The loop works end-to-end** when the move commit lands: playing `e4` and
+  committing it makes the computer (Black, level 0) reply `e7→e5` (1...e5),
+  detectable as a board frame change.
+
+**Open / flaky (blocks reliable gate execution):**
+- **Move entry + commit is timing-sensitive.** After reaching the board,
+  typing a move (`e4`) and pressing Enter to commit does **not** reliably reach
+  the emulated program: in some runs the commit lands (the move is played, the
+  computer replies) and in others the input is dropped (the board stays
+  byte-identical). Window focus is confirmed correct (`xdotool
+  getwindowfocus` returns the FUSE leaf window) yet the move keys still fail to
+  land intermittently. Menu input is unaffected — only the *on-board move
+  entry* is flaky. The driver's `play_move()` retries the type+commit up to
+  `attempts` times to compensate, but the root cause (why on-board key input is
+  less reliable than menu input under Xvfb) is not yet resolved. **This is the
+  remaining prerequisite before the Phase 3 fidelity gates can be run reliably.**
+
+**Read-the-move approach that works:** OCR the emulated frame with the local
+vision model (Spectrum Chess I's notation is short algebraic, e.g. `E4`), and
+detect the computer's reply by **frame difference** between the frame before
+and after the player's move — far more reliable than asking an OCR model "did a
+piece move?" on every poll.
+
 ## The seven reference programs and their files
 
 | # | Backend | Program | File | Emulator | Notes |
